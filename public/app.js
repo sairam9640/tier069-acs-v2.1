@@ -1141,8 +1141,14 @@ function renderTr069FleetTable(devices) {
     const ssid5 = has5G ? (d.wifi.wifi5.ssid || `${name}_5G`) : null;
     const clientCount = (d.connectedClients?.length || d.hosts?.length || 0);
 
+    const vendorProf = window.detectVendorProfile(d);
+    const rxFloat = parseFloat(rxStr);
+    let optClass = 'ont-opt-good';
+    if (!isNaN(rxFloat) && rxFloat < -27) optClass = 'ont-opt-danger';
+    else if (!isNaN(rxFloat) && rxFloat < -24) optClass = 'ont-opt-warn';
+
     return `
-      <tr onclick="openDeviceModal('${escapeHtml(d._id)}')" style="cursor: pointer;" title="Click to Inspect / Edit ONT">
+      <tr onclick="openDeviceModal('${escapeHtml(d._id)}')" style="cursor: pointer;" title="Click to View GACS Telemetry & Control ONT">
         <td>
           <div style="display:flex;align-items:center;gap:0.35rem;">
             <div style="font-weight:700;color:#ffffff;font-size:0.85rem;">${escapeHtml(name)}</div>
@@ -1163,14 +1169,16 @@ function renderTr069FleetTable(devices) {
           <span class="mono" style="color:#a855f7;font-weight:700;font-size:0.8rem;">${escapeHtml(mac)}</span>
         </td>
         <td>
-          <div style="font-weight:700;color:#ffffff;font-size:0.8rem;">${escapeHtml(vendor)}</div>
-          <div style="color:#94a3b8;font-size:0.72rem;">${escapeHtml(model)}</div>
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <span style="background:${vendorProf.color}22;border:1px solid ${vendorProf.color}66;color:${vendorProf.color};font-size:0.68rem;padding:1px 6px;border-radius:4px;font-weight:700;">${escapeHtml(vendorProf.name)}</span>
+            <span style="color:#ffffff;font-size:0.78rem;font-weight:600;">${escapeHtml(model)}</span>
+          </div>
         </td>
         <td>
-          ${isOnline ? `<span class="status-badge-online">Online</span>` : `<span class="status-badge-offline">Offline</span>`}
+          ${isOnline ? `<span class="status-badge-online">🟢 Online</span>` : `<span class="status-badge-offline">🔴 Offline</span>`}
         </td>
         <td>
-          <span class="mono ont-opt-power ont-opt-good">${escapeHtml(rxStr)}</span>
+          <span class="mono ont-opt-power ${optClass}">${escapeHtml(rxStr)}</span>
         </td>
         <td>
           <div style="font-size:0.75rem;color:#38bdf8;">2.4G: <strong>${escapeHtml(ssid24 || '—')}</strong></div>
@@ -1183,8 +1191,14 @@ function renderTr069FleetTable(devices) {
         </td>
         <td style="text-align:center;" onclick="event.stopPropagation();">
           <div style="display:inline-flex;gap:0.35rem;align-items:center;justify-content:center;">
-            <button class="btn-ont-view-action" onclick="event.stopPropagation(); openDeviceModal('${escapeHtml(d._id)}')">
-              ⚙️ Control
+            <button class="btn-ont-view-action" style="padding:0.25rem 0.65rem;" onclick="event.stopPropagation(); openDeviceModal('${escapeHtml(d._id)}')">
+              👁️ View
+            </button>
+            <button class="btn-ont-icon-action" title="Reboot ONT" onclick="event.stopPropagation(); window.rebootDevice('${escapeHtml(d._id)}')">
+              🔄
+            </button>
+            <button class="btn-ont-icon-action" title="Force Sync" onclick="event.stopPropagation(); quickSyncDevice('${escapeHtml(d._id)}')">
+              ⚡
             </button>
             <button class="btn-ont-icon-action" title="Delete ONT" style="color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="event.stopPropagation(); window.deleteOntDevice('${escapeHtml(d._id)}', '${escapeHtml(d.customer?.name || d._id)}')">
               🗑️
@@ -1381,6 +1395,64 @@ window.toggleSidebar = function() {
   if (sidebar) sidebar.classList.toggle('sidebar-open');
 };
 
+window.detectVendorProfile = function(dev) {
+  if (!dev) return { name: 'Universal XPON', prefix: 'TR-069 Std', badgeClass: 'vendor-badge-default', color: '#94a3b8' };
+  const m = (dev.deviceInfo?.manufacturer || dev.deviceInfo?.brand?.name || '').toLowerCase();
+  const pc = (dev.deviceInfo?.productClass || dev.deviceInfo?.modelName || '').toLowerCase();
+  const sn = (dev.deviceInfo?.serialNumber || dev.deviceInfo?.ponSerialNumber || dev._id || '').toLowerCase();
+
+  if (m.includes('huawei') || pc.includes('eg8') || pc.includes('hg8') || pc.includes('hs8') || sn.startsWith('hwst') || sn.startsWith('485754')) {
+    return { name: 'Huawei', prefix: 'X_HW', badgeClass: 'vendor-badge-huawei', color: '#ef4444' };
+  }
+  if (m.includes('zte') || pc.includes('f660') || pc.includes('f670') || pc.includes('f609') || pc.includes('f477') || pc.includes('gm220') || sn.startsWith('ztec')) {
+    return { name: 'ZTE', prefix: 'X_CT-COM / X_ZTE-COM', badgeClass: 'vendor-badge-zte', color: '#3b82f6' };
+  }
+  if (m.includes('fiberhome') || m.includes('fh') || pc.includes('an5506') || pc.includes('hg6145') || pc.includes('hg624')) {
+    return { name: 'FiberHome', prefix: 'X_FH', badgeClass: 'vendor-badge-fiberhome', color: '#f59e0b' };
+  }
+  if (m.includes('nokia') || m.includes('alcl') || pc.includes('g-1425') || pc.includes('g-010')) {
+    return { name: 'Nokia / Alcatel', prefix: 'X_ALU-COM', badgeClass: 'vendor-badge-nokia', color: '#06b6d4' };
+  }
+  if (m.includes('syrotech') || pc.includes('sy-gpon') || pc.includes('sy-epon') || sn.startsWith('f3242')) {
+    return { name: 'Syrotech', prefix: 'X_BROADCOM', badgeClass: 'vendor-badge-syrotech', color: '#10b981' };
+  }
+  if (m.includes('genexis') || pc.includes('platinum')) {
+    return { name: 'Genexis Platinum', prefix: 'InternetGatewayDevice', badgeClass: 'vendor-badge-genexis', color: '#8b5cf6' };
+  }
+  if (m.includes('tp-link') || pc.includes('tp-link') || m.includes('tplink')) {
+    return { name: 'TP-Link', prefix: 'InternetGatewayDevice', badgeClass: 'vendor-badge-tplink', color: '#14b8a6' };
+  }
+  return { name: dev.deviceInfo?.brand?.name || dev.deviceInfo?.manufacturer || 'Universal XPON', prefix: 'TR-069 Std', badgeClass: 'vendor-badge-default', color: '#94a3b8' };
+};
+
+window.quickRebootCurrentDevice = function() {
+  if (currentSelectedDevice && currentSelectedDevice._id) {
+    if (confirm(`🔄 Reboot ONT router "${currentSelectedDevice.customer?.name || currentSelectedDevice._id}" now via TR-069 CWMP?`)) {
+      window.rebootDevice(currentSelectedDevice._id);
+    }
+  } else {
+    showToast('No active device selected', 'warning');
+  }
+};
+
+window.factoryResetCurrentDevice = function() {
+  if (currentSelectedDevice && currentSelectedDevice._id) {
+    if (confirm(`⚠️ DANGER: Factory Reset ONT router "${currentSelectedDevice.customer?.name || currentSelectedDevice._id}" to initial defaults?`)) {
+      window.factoryResetDevice(currentSelectedDevice._id);
+    }
+  } else {
+    showToast('No active device selected', 'warning');
+  }
+};
+
+window.quickSyncCurrentDevice = function() {
+  if (currentSelectedDevice && currentSelectedDevice._id) {
+    quickSyncDevice(currentSelectedDevice._id);
+  } else {
+    showToast('No active device selected', 'warning');
+  }
+};
+
 function openDeviceModal(deviceId, defaultTab) {
   try {
     const dev = allDevices.find(d => d._id === deviceId);
@@ -1390,10 +1462,12 @@ function openDeviceModal(deviceId, defaultTab) {
     }
     currentSelectedDevice = dev;
 
+    const isOnline = isDeviceOnline(dev);
     const phoneOrName = dev.customer?.phone || dev.customer?.name || dev._id;
     const brandName = dev.deviceInfo?.brand?.name || dev.deviceInfo?.manufacturer || 'Realtek';
     const modelName = dev.deviceInfo?.modelName || 'Dual-Band ONT';
     const sn = dev.deviceInfo?.ponSerialNumber || dev.deviceInfo?.serialNumber || dev._id;
+    const vendorProf = window.detectVendorProfile(dev);
 
     const setTxt = (id, txt) => {
       const el = document.getElementById(id);
@@ -1404,8 +1478,64 @@ function openDeviceModal(deviceId, defaultTab) {
       if (el) el.value = val;
     };
 
-    setTxt('mDeviceTitle', `Edit CPE - ${phoneOrName}`);
+    setTxt('mDeviceTitle', `CPE Controller — ${phoneOrName}`);
     setTxt('mDeviceSubtitle', `${brandName} ${modelName} (SN: ${sn})`);
+
+    // --- POPULATE GACS SUMMARY & TELEMETRY TAB (TAB 0) ---
+    setTxt('gacsDeviceModelLabel', `${brandName} ${modelName}`);
+    setTxt('gacsPonSerialLabel', sn);
+    setTxt('gacsMacLabel', dev.deviceInfo?.macAddress || dev._id);
+    setTxt('gacsOuiLabel', dev.deviceInfo?.oui || (sn ? sn.slice(0, 6) : '--'));
+
+    const vendorBadgeEl = document.getElementById('gacsVendorProfileBadge');
+    if (vendorBadgeEl) {
+      vendorBadgeEl.textContent = `${vendorProf.name} (${vendorProf.prefix})`;
+      vendorBadgeEl.style.borderColor = vendorProf.color;
+      vendorBadgeEl.style.color = vendorProf.color;
+    }
+
+    const statusBadgeEl = document.getElementById('gacsStatusBadge');
+    if (statusBadgeEl) {
+      statusBadgeEl.className = isOnline ? 'tailadmin-badge success' : 'tailadmin-badge danger';
+      statusBadgeEl.textContent = isOnline ? '🟢 Online' : '🔴 Offline';
+    }
+
+    const rxVal = dev.opticalPower?.rxPower || dev.opticalPower?.rx || '-19.40 dBm';
+    const rxNum = parseFloat(rxVal);
+    setTxt('gacsRxPowerVal', rxVal);
+    setTxt('gacsTxPowerVal', dev.opticalPower?.txPower || dev.opticalPower?.tx || '2.45 dBm');
+    setTxt('gacsTempVal', dev.opticalPower?.temperature || '42.0 °C');
+    setTxt('gacsVoltVal', dev.opticalPower?.voltage || '3.30 V');
+
+    const clientCount = (dev.connectedClients?.length || dev.hosts?.length || 0);
+    setTxt('gacsActiveClientsVal', `${clientCount} Client(s)`);
+    setTxt('gacsUptimeVal', dev.deviceInfo?.uptime || dev.uptime || '4 days, 12 hrs');
+    setTxt('gacsLastInformVal', dev.lastInform ? `Last Inform: ${new Date(dev.lastInform).toLocaleTimeString('en-IN')}` : 'Last Inform: Active');
+
+    const rxStatusEl = document.getElementById('gacsRxHealthStatus');
+    if (rxStatusEl) {
+      if (!isNaN(rxNum) && rxNum < -27) {
+        rxStatusEl.textContent = '🔴 Critical Signal Loss (< -27 dBm)';
+        rxStatusEl.style.color = '#ef4444';
+      } else if (!isNaN(rxNum) && rxNum < -24) {
+        rxStatusEl.textContent = '🟡 Marginal Attenuation (-24 to -27 dBm)';
+        rxStatusEl.style.color = '#f59e0b';
+      } else {
+        rxStatusEl.textContent = '🟢 Normal Laser Quality (Optimal)';
+        rxStatusEl.style.color = '#10b981';
+      }
+    }
+
+    setTxt('gacsPppUsernameLabel', dev.wan?.username || dev.customer?.accountId || 'Not Set');
+    setTxt('gacsWanIpLabel', dev.network?.externalIP || dev.wan?.ipAddress || '0.0.0.0');
+    setTxt('gacsVlanIdLabel', dev.wan?.vlanId && !isNaN(dev.wan.vlanId) ? String(dev.wan.vlanId) : '100 (Untagged)');
+    setTxt('gacsSsid24Label', dev.wifi?.wifi24?.ssid || 'Not Set');
+    setTxt('gacsSsid5Label', dev.wifi?.wifi5?.ssid || (dev.wifi?.isDualBand ? 'Dual-Band 5G' : 'Single Band (2.4G Only)'));
+
+    setTxt('gacsSwVersionLabel', dev.deviceInfo?.softwareVersion || dev.deviceInfo?.firmwareVersion || 'V2.0.1_PROD');
+    setTxt('gacsHwVersionLabel', dev.deviceInfo?.hardwareVersion || 'V1.0');
+    setTxt('gacsProductClassLabel', dev.deviceInfo?.productClass || modelName);
+    setTxt('gacsCrUrlLabel', dev.network?.connectionRequestURL || `http://${dev.network?.externalIP || '127.0.0.1'}:7547/`);
 
     // Populate WAN Connections Table
     const wanTbody = document.getElementById('tblWanConnectionsBody');
@@ -1496,8 +1626,6 @@ function openDeviceModal(deviceId, defaultTab) {
     }
 
     // Populate Optical Tab
-    const rxVal = dev.opticalPower?.rxPower || '-19.40 dBm';
-    const rxNum = parseFloat(rxVal);
     setTxt('modalRxPower', rxVal);
     setTxt('modalTxPower', dev.opticalPower?.txPower || '2.45 dBm');
     setTxt('modalOptTemp', dev.opticalPower?.temperature || '42.1 °C');
@@ -1613,12 +1741,11 @@ function openDeviceModal(deviceId, defaultTab) {
       modalEl.style.display = 'flex';
     }
 
-    // Activate selected tab or default to WAN tab
     if (defaultTab) {
       const targetBtn = document.querySelector(`.modal-tab-btn[data-mtab="${defaultTab}"], .m-tab-btn[data-mtab="${defaultTab}"]`);
       if (targetBtn) targetBtn.click();
     } else {
-      const firstTab = document.querySelector('.modal-tab-btn[data-mtab="mtab-wan"], .m-tab-btn[data-mtab="mtab-wan"]');
+      const firstTab = document.querySelector('.modal-tab-btn[data-mtab="mtab-overview"], .m-tab-btn[data-mtab="mtab-overview"]');
       if (firstTab) firstTab.click();
     }
 

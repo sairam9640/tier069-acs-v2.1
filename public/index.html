@@ -1432,22 +1432,130 @@
         <button class="btn-icon-action" onclick="closeDeviceModal()">✕</button>
       </div>
 
-      <!-- 7-TAB NAVIGATION BAR -->
+      <!-- 8-TAB NAVIGATION BAR (GACS + TR-069 NOC SUITE) -->
       <div class="modal-tabs-bar">
-        <button class="modal-tab-btn active" data-mtab="mtab-wan">🌐 WAN</button>
-        <button class="modal-tab-btn" data-mtab="mtab-wifi">📶 WiFi (Multi-SSID)</button>
+        <button class="modal-tab-btn active" data-mtab="mtab-overview">📊 Summary & Telemetry</button>
+        <button class="modal-tab-btn" data-mtab="mtab-wan">🌐 WAN & PPPoE</button>
+        <button class="modal-tab-btn" data-mtab="mtab-wifi">📶 WiFi Management</button>
         <button class="modal-tab-btn" data-mtab="mtab-hosts">📱 Connected Devices</button>
+        <button class="modal-tab-btn" data-mtab="mtab-optical">⚡ Optical Telemetry</button>
+        <button class="modal-tab-btn" data-mtab="mtab-customer">🗺️ Topology & GIS</button>
+        <button class="modal-tab-btn" data-mtab="mtab-actions">⚙️ Remote Actions</button>
         <button class="modal-tab-btn" data-mtab="mtab-speedtest">🚀 Speed Test</button>
         <button class="modal-tab-btn" data-mtab="mtab-voip">📞 VoIP</button>
-        <button class="modal-tab-btn" data-mtab="mtab-optical">⚡ Optical Telemetry</button>
-        <button class="modal-tab-btn" data-mtab="mtab-customer">👤 Customer & GIS</button>
-        <button class="modal-tab-btn" data-mtab="mtab-actions">⚙️ Diagnostics & Actions</button>
       </div>
 
       <div class="modal-body">
 
+        <!-- TAB 0: GACS SUMMARY & LIVE TELEMETRY -->
+        <div class="mtab-content active" id="mtab-overview">
+          <!-- Top Vendor & Hardware Identity Banner -->
+          <div style="background:linear-gradient(135deg, rgba(30,41,59,0.7) 0%, rgba(15,23,42,0.9) 100%);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem 1.25rem;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:48px;height:48px;border-radius:10px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;justify-content:center;font-size:1.5rem;" id="gacsVendorIcon">
+                📡
+              </div>
+              <div>
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                  <strong style="color:#ffffff;font-size:1.05rem;" id="gacsDeviceModelLabel">Huawei EG8145V5 Dual-Band ONT</strong>
+                  <span class="tailadmin-badge success" id="gacsStatusBadge">🟢 Online</span>
+                  <span id="gacsVendorProfileBadge" style="background:rgba(99,102,241,0.15);border:1px solid #6366f1;color:#818cf8;font-size:0.7rem;padding:2px 8px;border-radius:6px;font-weight:700;">Huawei (X_HW)</span>
+                </div>
+                <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;">
+                  PON Serial: <strong class="mono" style="color:#38bdf8;" id="gacsPonSerialLabel">--</strong> • MAC: <span class="mono" style="color:#cbd5e1;" id="gacsMacLabel">--</span> • OUI: <span class="mono" id="gacsOuiLabel">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+              <button type="button" class="btn-primary" style="padding:0.4rem 0.85rem;font-size:0.75rem;background:#3b82f6;border-color:#2563eb;" onclick="quickSyncCurrentDevice()" title="Send Connection Request to ONT">
+                ⚡ Force CWMP Sync
+              </button>
+              <button type="button" class="btn-outline" style="padding:0.4rem 0.85rem;font-size:0.75rem;color:#f59e0b;border-color:rgba(245,158,11,0.4);" onclick="quickRebootCurrentDevice()" title="Reboot Router Remotely">
+                🔄 Reboot ONT
+              </button>
+              <button type="button" class="btn-outline" style="padding:0.4rem 0.85rem;font-size:0.75rem;color:#ef4444;border-color:rgba(239,68,68,0.4);" onclick="factoryResetCurrentDevice()" title="Restore Factory Defaults">
+                ⚠️ Factory Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- 6-Metric Telemetry Cards Grid (GACS Style) -->
+          <div class="tailadmin-card-grid" style="grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:0.85rem;margin-bottom:1.25rem;">
+            <!-- 1. Optical Rx Power -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Optical Rx Power</div>
+              <div class="mono" style="font-size:1.35rem;font-weight:800;color:#38bdf8;margin:0.25rem 0;" id="gacsRxPowerVal">-- dBm</div>
+              <div style="font-size:0.7rem;font-weight:700;" id="gacsRxHealthStatus">🟢 Normal Quality</div>
+            </div>
+
+            <!-- 2. Optical Tx Power -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Optical Tx Power</div>
+              <div class="mono" style="font-size:1.35rem;font-weight:800;color:#10b981;margin:0.25rem 0;" id="gacsTxPowerVal">-- dBm</div>
+              <div style="font-size:0.7rem;color:#64748b;">Transceiver Output</div>
+            </div>
+
+            <!-- 3. Operating Temperature -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Core Temperature</div>
+              <div class="mono" style="font-size:1.35rem;font-weight:800;color:#f59e0b;margin:0.25rem 0;" id="gacsTempVal">-- °C</div>
+              <div style="font-size:0.7rem;color:#64748b;">Hardware Thermal</div>
+            </div>
+
+            <!-- 4. Laser Voltage -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Supply Voltage</div>
+              <div class="mono" style="font-size:1.35rem;font-weight:800;color:#8b5cf6;margin:0.25rem 0;" id="gacsVoltVal">3.30 V</div>
+              <div style="font-size:0.7rem;color:#64748b;">SFP Power Rail</div>
+            </div>
+
+            <!-- 5. Active Connected Hosts -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Active Clients</div>
+              <div class="mono" style="font-size:1.35rem;font-weight:800;color:#06b6d4;margin:0.25rem 0;" id="gacsActiveClientsVal">0 Hosts</div>
+              <div style="font-size:0.7rem;color:#64748b;">WiFi + LAN DHCP Leases</div>
+            </div>
+
+            <!-- 6. Uptime & Last Inform -->
+            <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+              <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Uptime</div>
+              <div class="mono" style="font-size:1.15rem;font-weight:800;color:#ffffff;margin:0.25rem 0;" id="gacsUptimeVal">--</div>
+              <div style="font-size:0.7rem;color:#64748b;" id="gacsLastInformVal">Last Inform: --</div>
+            </div>
+          </div>
+
+          <!-- Parameter Summary & Quick Status -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;">
+            <!-- Left Box: Provisioning & Credentials -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1.15rem;">
+              <strong style="font-size:0.85rem;color:#38bdf8;display:block;margin-bottom:0.75rem;">🌐 Provisioned Service Profile</strong>
+              <div style="display:flex;flex-direction:column;gap:0.45rem;font-size:0.78rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">PPPoE Username:</span> <strong class="mono" style="color:#ffffff;" id="gacsPppUsernameLabel">--</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Assigned WAN IP:</span> <span class="mono" style="color:#10b981;font-weight:700;" id="gacsWanIpLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">VLAN ID (Tag):</span> <span class="mono" style="color:#f59e0b;font-weight:700;" id="gacsVlanIdLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Primary 2.4G WiFi:</span> <strong class="mono" style="color:#38bdf8;" id="gacsSsid24Label">--</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">High-Speed 5G WiFi:</span> <strong class="mono" style="color:#a855f7;" id="gacsSsid5Label">--</strong></div>
+              </div>
+            </div>
+
+            <!-- Right Box: TR-069 Management Parameters -->
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1.15rem;">
+              <strong style="font-size:0.85rem;color:#818cf8;display:block;margin-bottom:0.75rem;">⚙️ TR-069 CWMP Management</strong>
+              <div style="display:flex;flex-direction:column;gap:0.45rem;font-size:0.78rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Software Version:</span> <span class="mono" style="color:#ffffff;" id="gacsSwVersionLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Hardware Version:</span> <span class="mono" style="color:#cbd5e1;" id="gacsHwVersionLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Product Class:</span> <span class="mono" style="color:#cbd5e1;" id="gacsProductClassLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Connection Request:</span> <span class="mono" style="color:#64748b;font-size:0.7rem;overflow:hidden;text-overflow:ellipsis;max-width:180px;" id="gacsCrUrlLabel">--</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Management ACS:</span> <span class="mono" style="color:#38bdf8;">http://ciniplay.in/</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- TAB 1: WAN CONFIGURATION -->
-        <div class="mtab-content active" id="mtab-wan">
+        <div class="mtab-content" id="mtab-wan">
           <!-- Active Connection Interfaces Table -->
           <div style="margin-bottom:1.25rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
