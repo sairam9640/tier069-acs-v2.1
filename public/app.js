@@ -1076,23 +1076,61 @@ function renderTr069FleetView() {
   }
 }
 
+function formatRelativeTime(date) {
+  if (!date) return 'Just now';
+  const now = new Date();
+  const d = new Date(date);
+  const diffSec = Math.floor((now - d) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} Minutes Ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} Hours Ago`;
+  return `${Math.floor(diffSec / 86400)} Days Ago`;
+}
+
 function filterTr069Table() {
   const q = (document.getElementById('searchTr069Input')?.value || '').toLowerCase().trim();
+  const statusFilter = document.getElementById('gacsStatusFilter')?.value || 'ALL';
 
-  // Filter only genuine TR-069 enabled ONTs
+  // Compute GACS 4 KPI Metrics across fleet
+  let excellent = 0, fair = 0, poor = 0, offline = 0;
+  allDevices.forEach(d => {
+    const isOnline = isDeviceOnline(d);
+    if (!isOnline) {
+      offline++;
+    } else {
+      const rx = parseFloat(d.opticalPower?.rxPower || d.opticalPower?.rx || '-19');
+      if (isNaN(rx) || rx >= -22) excellent++;
+      else if (rx >= -26) fair++;
+      else poor++;
+    }
+  });
+
+  const elExc = document.getElementById('kpiGacsExcellent');
+  const elFair = document.getElementById('kpiGacsFair');
+  const elPoor = document.getElementById('kpiGacsPoor');
+  const elOff = document.getElementById('kpiGacsOffline');
+  if (elExc) elExc.textContent = excellent;
+  if (elFair) elFair.textContent = fair;
+  if (elPoor) elPoor.textContent = poor;
+  if (elOff) elOff.textContent = offline;
+
+  // Filter devices
   const tr069Devices = allDevices.filter(d => {
+    const isOnline = isDeviceOnline(d);
+    if (statusFilter === 'ONLINE' && !isOnline) return false;
+    if (statusFilter === 'OFFLINE' && isOnline) return false;
+
     if (!q) return true;
     const text = [
       d.customer?.name,
       d.customer?.phone,
       d.customer?.accountId,
       d.wan?.username,
-      d.wan?.password,
       d.deviceInfo?.serialNumber,
       d.deviceInfo?.ponSerialNumber,
       d.deviceInfo?.macAddress,
-      d.network?.externalIP,
-      d.wan?.ipAddress,
+      d.deviceInfo?.productClass,
+      d.deviceInfo?.modelName,
       d.wifi?.wifi24?.ssid,
       d.wifi?.wifi5?.ssid
     ].filter(Boolean).join(' ').toLowerCase();
@@ -1100,10 +1138,8 @@ function filterTr069Table() {
     return text.includes(q);
   });
 
-  const kpiTotal = document.getElementById('kpiTr069Total');
-  const kpiOnline = document.getElementById('kpiTr069Online');
-  if (kpiTotal) kpiTotal.textContent = tr069Devices.length;
-  if (kpiOnline) kpiOnline.textContent = tr069Devices.filter(d => isDeviceOnline(d)).length;
+  const elPagination = document.getElementById('gacsPaginationText');
+  if (elPagination) elPagination.textContent = `Showing 1-${tr069Devices.length} of ${allDevices.length} devices`;
 
   renderTr069FleetTable(tr069Devices);
 }
@@ -1115,9 +1151,9 @@ function renderTr069FleetTable(devices) {
   if (devices.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" style="text-align:center;padding:3rem;color:#94a3b8;">
+        <td colspan="12" style="text-align:center;padding:3rem;color:#94a3b8;">
           <div style="font-size:1.5rem;margin-bottom:0.5rem;">📡</div>
-          <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">No TR-069 Subscriber ONTs Found</div>
+          <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">No ONT Devices Found</div>
           <div style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Subscriber routers will appear automatically upon their first TR-069 HTTP Inform session.</div>
         </td>
       </tr>
@@ -1127,80 +1163,108 @@ function renderTr069FleetTable(devices) {
 
   tbody.innerHTML = devices.map(d => {
     const isOnline = isDeviceOnline(d);
-    const name = d.customer?.name || 'Unassigned Customer';
-    const phone = d.customer?.phone || 'No phone set';
-    const pppUser = d.wan?.username || d.customer?.accountId || '';
-    const ip = d.network?.externalIP || d.wan?.ipAddress || d.ipAddress || '';
-    const mac = d.deviceInfo?.macAddress || d._id;
-    const vendor = d.deviceInfo?.brand?.name || d.deviceInfo?.manufacturer || 'Realtek';
-    const model = d.deviceInfo?.modelName || 'Dual-Band ONT';
-    const rxStr = d.opticalPower?.rxPower || d.opticalPower?.rx || '-18.50 dBm';
-
-    const ssid24 = d.wifi?.wifi24?.ssid || '';
-    const has5G = !!(d.wifi?.isDualBand || (d.wifi?.wifi5 && d.wifi.wifi5.ssid));
-    const ssid5 = has5G ? (d.wifi.wifi5.ssid || `${name}_5G`) : null;
-    const clientCount = (d.connectedClients?.length || d.hosts?.length || 0);
-
-    const vendorProf = window.detectVendorProfile(d);
+    const sn = d.deviceInfo?.ponSerialNumber || d.deviceInfo?.serialNumber || d._id;
+    const tags = d.customer?.name ? d.customer.name : '-';
+    const productClass = d.deviceInfo?.productClass || d.deviceInfo?.modelName || 'ZL-2113X';
+    const odp = d.customer?.fdpId || 'N/A';
+    const rxStr = d.opticalPower?.rxPower || d.opticalPower?.rx || '-19 dBm';
     const rxFloat = parseFloat(rxStr);
-    let optClass = 'ont-opt-good';
-    if (!isNaN(rxFloat) && rxFloat < -27) optClass = 'ont-opt-danger';
-    else if (!isNaN(rxFloat) && rxFloat < -24) optClass = 'ont-opt-warn';
+    
+    let rxBadgeBg = 'rgba(16,185,129,0.15)', rxBadgeColor = '#10b981';
+    if (!isNaN(rxFloat) && rxFloat < -26) {
+      rxBadgeBg = 'rgba(239,68,68,0.15)';
+      rxBadgeColor = '#ef4444';
+    } else if (!isNaN(rxFloat) && rxFloat < -22) {
+      rxBadgeBg = 'rgba(245,158,11,0.15)';
+      rxBadgeColor = '#f59e0b';
+    }
+
+    const pppUser = d.wan?.username || d.customer?.accountId || '—';
+    const ssid = d.wifi?.wifi24?.ssid || (d.customer?.name ? `${d.customer.name}_WiFi` : '—');
+    const clientCount = (d.connectedClients?.length || d.hosts?.length || 0);
+    const wanBridge = d.wan?.connectionType?.includes('Bridge') ? 'Bridge' : 'N/A';
+    const lastInformStr = formatRelativeTime(d.lastInform || d.updatedAt);
 
     return `
       <tr onclick="openDeviceModal('${escapeHtml(d._id)}')" style="cursor: pointer;" title="Click to View GACS Telemetry & Control ONT">
+        <!-- 1. SerialNumber -->
         <td>
-          <div style="display:flex;align-items:center;gap:0.35rem;">
-            <div style="font-weight:700;color:#ffffff;font-size:0.85rem;">${escapeHtml(name)}</div>
-            <button class="btn-ont-icon-action" style="padding:1px 5px;font-size:0.65rem;" title="Tag / Edit Customer Name" onclick="event.stopPropagation(); window.tagCustomerName('${escapeHtml(d._id)}', '${escapeHtml(name)}')">🏷️</button>
-          </div>
-          <div style="font-size:0.72rem;color:#94a3b8;">📞 ${escapeHtml(phone)}</div>
+          <span class="mono" style="font-weight:700;color:#ffffff;font-size:0.82rem;">${escapeHtml(sn)}</span>
         </td>
+
+        <!-- 2. Tags / Customer -->
         <td>
-          <div class="mono" style="color:#38bdf8;font-weight:700;font-size:0.8rem;">${escapeHtml(pppUser || '—')}</div>
-          <div style="display:flex;align-items:center;gap:0.35rem;">
-            <span class="mono" style="color:#64748b;font-size:0.72rem;">${escapeHtml(ip || '0.0.0.0')}</span>
-            ${ip && ip !== '0.0.0.0' ? `
-              <button class="btn-ont-icon-action" style="padding:1px 4px;font-size:0.62rem;" title="Ping WAN IP" onclick="event.stopPropagation(); window.pingDeviceIp('${escapeHtml(d._id)}', '${escapeHtml(ip)}')">⚡</button>
-            ` : ''}
-          </div>
+          <span style="color:#94a3b8;font-size:0.75rem;">${escapeHtml(tags)}</span>
         </td>
+
+        <!-- 3. ProductClass -->
         <td>
-          <span class="mono" style="color:#a855f7;font-weight:700;font-size:0.8rem;">${escapeHtml(mac)}</span>
+          <span class="mono" style="color:#cbd5e1;font-size:0.78rem;">${escapeHtml(productClass)}</span>
         </td>
+
+        <!-- 4. ODP Splitter -->
         <td>
-          <div style="display:flex;align-items:center;gap:0.4rem;">
-            <span style="background:${vendorProf.color}22;border:1px solid ${vendorProf.color}66;color:${vendorProf.color};font-size:0.68rem;padding:1px 6px;border-radius:4px;font-weight:700;">${escapeHtml(vendorProf.name)}</span>
-            <span style="color:#ffffff;font-size:0.78rem;font-weight:600;">${escapeHtml(model)}</span>
-          </div>
+          <span style="color:#64748b;font-size:0.75rem;">${escapeHtml(odp)}</span>
         </td>
+
+        <!-- 5. RxPower -->
         <td>
-          ${isOnline ? `<span class="status-badge-online">🟢 Online</span>` : `<span class="status-badge-offline">🔴 Offline</span>`}
-        </td>
-        <td>
-          <span class="mono ont-opt-power ${optClass}">${escapeHtml(rxStr)}</span>
-        </td>
-        <td>
-          <div style="font-size:0.75rem;color:#38bdf8;">2.4G: <strong>${escapeHtml(ssid24 || '—')}</strong></div>
-          ${has5G ? `<div style="font-size:0.75rem;color:#a855f7;">5G: <strong>${escapeHtml(ssid5)}</strong></div>` : `<div style="font-size:0.68rem;color:#64748b;">5G: Not Supported</div>`}
-        </td>
-        <td>
-          <span class="mono" style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:2px 8px;border-radius:6px;font-size:0.75rem;font-weight:700;">
-            📱 ${clientCount} Hosts
+          <span style="background:${rxBadgeBg};color:${rxBadgeColor};padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.75rem;display:inline-flex;align-items:center;gap:4px;">
+            📶 ${escapeHtml(rxStr)}
           </span>
         </td>
+
+        <!-- 6. Status -->
+        <td>
+          ${isOnline ? `
+            <span style="background:rgba(16,185,129,0.15);color:#10b981;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.75rem;">
+              online
+            </span>
+          ` : `
+            <span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.75rem;">
+              offline
+            </span>
+          `}
+        </td>
+
+        <!-- 7. PPPoE -->
+        <td>
+          <span class="mono" style="color:#38bdf8;font-weight:700;font-size:0.8rem;">${escapeHtml(pppUser)}</span>
+        </td>
+
+        <!-- 8. SSID -->
+        <td>
+          <strong style="color:#ffffff;font-size:0.78rem;">${escapeHtml(ssid)}</strong>
+        </td>
+
+        <!-- 9. Connected Devices -->
+        <td>
+          <span style="color:#cbd5e1;font-size:0.75rem;">${clientCount > 0 ? clientCount : '—'}</span>
+        </td>
+
+        <!-- 10. WanBridge -->
+        <td>
+          <span style="color:${wanBridge === 'Bridge' ? '#f59e0b' : '#ef4444'};font-size:0.75rem;font-weight:600;">${escapeHtml(wanBridge)}</span>
+        </td>
+
+        <!-- 11. Last Inform -->
+        <td>
+          <span style="color:#94a3b8;font-size:0.75rem;">${escapeHtml(lastInformStr)}</span>
+        </td>
+
+        <!-- 12. Actions (Purple Summon, Blue View, Red Delete) -->
         <td style="text-align:center;" onclick="event.stopPropagation();">
           <div style="display:inline-flex;gap:0.35rem;align-items:center;justify-content:center;">
-            <button class="btn-ont-view-action" style="padding:0.25rem 0.65rem;" onclick="event.stopPropagation(); openDeviceModal('${escapeHtml(d._id)}')">
-              👁️ View
-            </button>
-            <button class="btn-ont-icon-action" title="Reboot ONT" onclick="event.stopPropagation(); window.rebootDevice('${escapeHtml(d._id)}')">
+            <!-- 1. Summon Button (Purple) -->
+            <button type="button" style="background:#7c3aed;border:none;color:#ffffff;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.75rem;" title="Summon / CWMP Connection Request" onclick="event.stopPropagation(); quickSyncDevice('${escapeHtml(d._id)}')">
               🔄
             </button>
-            <button class="btn-ont-icon-action" title="Force Sync" onclick="event.stopPropagation(); quickSyncDevice('${escapeHtml(d._id)}')">
-              ⚡
+            <!-- 2. View Button (Blue) -->
+            <button type="button" style="background:#2563eb;border:none;color:#ffffff;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.75rem;" title="View Details" onclick="event.stopPropagation(); openDeviceModal('${escapeHtml(d._id)}')">
+              👁️
             </button>
-            <button class="btn-ont-icon-action" title="Delete ONT" style="color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="event.stopPropagation(); window.deleteOntDevice('${escapeHtml(d._id)}', '${escapeHtml(d.customer?.name || d._id)}')">
+            <!-- 3. Delete Button (Red) -->
+            <button type="button" style="background:#dc2626;border:none;color:#ffffff;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:0.75rem;" title="Delete ONT" onclick="event.stopPropagation(); window.deleteOntDevice('${escapeHtml(d._id)}', '${escapeHtml(d.customer?.name || sn)}')">
               🗑️
             </button>
           </div>
@@ -1593,22 +1657,33 @@ function openDeviceModal(deviceId, defaultTab) {
     setVal('wanPassword', dev.wan?.password || '');
     setVal('wanVlanId', dev.wan?.vlanId && !isNaN(dev.wan.vlanId) ? dev.wan.vlanId : 203);
 
-    // Populate WiFi Tab
-    const w24Ssid = dev.wifi?.wifi24?.ssid || '';
+    // Populate GACS 4-Card SSID Grid
+    const w24Ssid = dev.wifi?.wifi24?.ssid || (dev.customer?.name ? `${dev.customer.name}_2.4G` : 'Rudra_Fiber_2.4G');
     const has5GDev = !!(dev.wifi?.isDualBand || (dev.wifi?.wifi5 && dev.wifi.wifi5.ssid));
-    const w5Ssid = has5GDev ? (dev.wifi?.wifi5?.ssid || '') : '';
-    setVal('wlan24Ssid', w24Ssid);
-    setVal('wlan24Password', dev.wifi?.wifi24?.password || '');
-    setVal('wlan5Ssid', w5Ssid);
-    setVal('wlan5Password', dev.wifi?.wifi5?.password || '');
-    setTxt('wlanRow1Ssid', w24Ssid || '—');
-    setTxt('wlanRow2Ssid', has5GDev ? (w5Ssid || '—') : 'Not Supported');
+    const w5Ssid = has5GDev ? (dev.wifi?.wifi5?.ssid || (dev.customer?.name ? `${dev.customer.name}_5G` : 'Rudra_Fiber_5G')) : 'WIFI2.4G_01';
+    const s3Ssid = dev.wifi?.guest24?.ssid || 'WIFI2.4G_02';
+    const s4Ssid = dev.wifi?.guest5?.ssid || 'WIFI2.4G_03';
 
-    // 5GHz Radio Availability Check
-    const w5Section = document.getElementById('wlan5gConfigSection');
-    const w5Notice = document.getElementById('wlan5gNotSupportedNotice');
-    if (w5Section) w5Section.style.display = has5GDev ? 'grid' : 'none';
-    if (w5Notice) w5Notice.style.display = has5GDev ? 'none' : 'block';
+    setTxt('gacsSsid1NameVal', w24Ssid);
+    setTxt('gacsSsid1SecVal', dev.wifi?.wifi24?.security || 'WPAand11i (WPA2-PSK)');
+    setTxt('gacsSsid1Clients', `👥 ${dev.connectedClients?.length || 0} Connected`);
+
+    setTxt('gacsSsid2NameVal', w5Ssid);
+    setTxt('gacsSsid2SecVal', dev.wifi?.wifi5?.security || 'WPAand11i');
+    const b2 = document.getElementById('gacsSsid2ActiveBadge');
+    if (b2) {
+      b2.className = has5GDev ? 'tailadmin-badge success' : 'tailadmin-badge';
+      b2.textContent = has5GDev ? '● Active' : '● Inactive';
+      b2.style.background = has5GDev ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)';
+      b2.style.color = has5GDev ? '#10b981' : '#94a3b8';
+    }
+
+    setTxt('gacsSsid3NameVal', s3Ssid);
+    setTxt('gacsSsid4NameVal', s4Ssid);
+
+    // Hide edit drawer initially
+    const drawerEl = document.getElementById('gacsWifiEditDrawer');
+    if (drawerEl) drawerEl.style.display = 'none';
 
     // Populate VoIP Tab
     if (dev.voip?.isConfigured || dev.voip?.phone || dev.voip?.sipServer) {
@@ -1762,8 +1837,119 @@ function openDeviceModal(deviceId, defaultTab) {
 function closeDeviceModal() {
   const modalEl = document.getElementById('deviceModal');
   if (modalEl) modalEl.style.display = 'none';
+  const drawerEl = document.getElementById('gacsWifiEditDrawer');
+  if (drawerEl) drawerEl.style.display = 'none';
   currentSelectedDevice = null;
 }
+
+window.openQuickWifiEditModal = function(ssidIndex) {
+  if (!currentSelectedDevice) return;
+  const drawer = document.getElementById('gacsWifiEditDrawer');
+  if (!drawer) return;
+
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  setVal('gacsEditSsidIndex', ssidIndex);
+  setTxt('gacsWifiEditTitle', `✏️ Edit SSID ${ssidIndex} Configuration`);
+
+  let currentSsid = '', currentPwd = '12345678', currentSec = 'WPAand11i';
+  if (ssidIndex === 1) {
+    currentSsid = currentSelectedDevice.wifi?.wifi24?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_2.4G` : 'Rudra_Fiber_2.4G');
+    currentPwd = currentSelectedDevice.wifi?.wifi24?.password || '12345678';
+    currentSec = currentSelectedDevice.wifi?.wifi24?.security || 'WPAand11i';
+  } else if (ssidIndex === 2) {
+    currentSsid = currentSelectedDevice.wifi?.wifi5?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_5G` : 'WIFI2.4G_01');
+    currentPwd = currentSelectedDevice.wifi?.wifi5?.password || '12345678';
+    currentSec = currentSelectedDevice.wifi?.wifi5?.security || 'WPAand11i';
+  } else if (ssidIndex === 3) {
+    currentSsid = currentSelectedDevice.wifi?.guest24?.ssid || 'WIFI2.4G_02';
+    currentPwd = currentSelectedDevice.wifi?.guest24?.password || '12345678';
+  } else if (ssidIndex === 4) {
+    currentSsid = currentSelectedDevice.wifi?.guest5?.ssid || 'WIFI2.4G_03';
+    currentPwd = currentSelectedDevice.wifi?.guest5?.password || '12345678';
+  }
+
+  setVal('gacsEditSsidName', currentSsid);
+  setVal('gacsEditSsidPassword', currentPwd);
+  setVal('gacsEditSsidSecurity', currentSec);
+
+  drawer.style.display = 'block';
+  drawer.scrollIntoView({ behavior: 'smooth' });
+};
+
+window.saveGacsWifiConfig = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) {
+    showToast('No active device selected', 'error');
+    return;
+  }
+  const idx = parseInt(document.getElementById('gacsEditSsidIndex')?.value || '1', 10);
+  const ssid = document.getElementById('gacsEditSsidName')?.value.trim();
+  const password = document.getElementById('gacsEditSsidPassword')?.value.trim();
+  const security = document.getElementById('gacsEditSsidSecurity')?.value || 'WPAand11i';
+  const enable = document.getElementById('gacsEditSsidEnable')?.value === '1';
+
+  if (!ssid) {
+    showToast('SSID Network Name cannot be empty', 'warning');
+    return;
+  }
+  if (password && password.length < 8) {
+    showToast('WPA2 Passphrase must be at least 8 characters long', 'warning');
+    return;
+  }
+
+  showToast(`Pushing SSID ${idx} parameters to ONT via TR-069...`, 'info');
+
+  try {
+    const payload = {
+      ssidIndex: idx,
+      ssid,
+      password,
+      security,
+      enable
+    };
+    if (idx === 1) {
+      payload.wifi24Ssid = ssid;
+      payload.wifi24Password = password;
+    } else if (idx === 2) {
+      payload.wifi5Ssid = ssid;
+      payload.wifi5Password = password;
+    }
+
+    const res = await authFetch(`/api/devices/${encodeURIComponent(currentSelectedDevice._id)}/wifi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ SSID ${idx} (${ssid}) pushed to ONT successfully!`, 'success');
+      document.getElementById('gacsWifiEditDrawer').style.display = 'none';
+
+      // Update local memory & UI labels
+      if (idx === 1) {
+        if (!currentSelectedDevice.wifi) currentSelectedDevice.wifi = {};
+        if (!currentSelectedDevice.wifi.wifi24) currentSelectedDevice.wifi.wifi24 = {};
+        currentSelectedDevice.wifi.wifi24.ssid = ssid;
+        currentSelectedDevice.wifi.wifi24.password = password;
+        currentSelectedDevice.wifi.wifi24.security = security;
+        const el = document.getElementById('gacsSsid1NameVal'); if (el) el.textContent = ssid;
+      } else if (idx === 2) {
+        if (!currentSelectedDevice.wifi) currentSelectedDevice.wifi = {};
+        if (!currentSelectedDevice.wifi.wifi5) currentSelectedDevice.wifi.wifi5 = {};
+        currentSelectedDevice.wifi.wifi5.ssid = ssid;
+        currentSelectedDevice.wifi.wifi5.password = password;
+        const el = document.getElementById('gacsSsid2NameVal'); if (el) el.textContent = ssid;
+      }
+
+      await loadDevices();
+    } else {
+      showToast(data.message || data.error || 'Failed to push WiFi configuration', 'error');
+    }
+  } catch (err) {
+    showToast('WiFi push error: ' + err.message, 'error');
+  }
+};
 
 let miniFdpMarkers = [];
 

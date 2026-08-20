@@ -699,61 +699,130 @@
             </div>
           </div>
 
-          <!-- TR-069 KPI CARDS -->
-          <div class="ont-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.25rem;">
-            <div class="ont-kpi-card">
-              <div class="ont-kpi-icon ont-icon-blue">📡</div>
+          <!-- 4 GACS KPI SIGNAL CARDS (EXACT SCREENSHOT MATCH) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:1rem;margin-bottom:1.5rem;">
+            <!-- 1. Excellent Signal -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.15rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div class="ont-kpi-title">TR-069 Bound ONTs</div>
-                <div class="ont-kpi-value" style="color:#38bdf8;" id="kpiTr069Total">11</div>
-                <div class="ont-kpi-sub">CWMP Active Protocol</div>
+                <div style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Excellent Signal</div>
+                <div class="mono" style="font-size:1.75rem;font-weight:800;color:#ffffff;margin-top:0.25rem;" id="kpiGacsExcellent">0</div>
+              </div>
+              <div style="width:42px;height:42px;border-radius:50%;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;color:#10b981;font-size:1.2rem;font-weight:700;">
+                ↑
               </div>
             </div>
-            <div class="ont-kpi-card">
-              <div class="ont-kpi-icon ont-icon-green">🟢</div>
+
+            <!-- 2. Fair Signal -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.15rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div class="ont-kpi-title">Live Online Sessions</div>
-                <div class="ont-kpi-value" style="color:#10b981;" id="kpiTr069Online">11</div>
-                <div class="ont-kpi-sub">5-Min Informs Active</div>
+                <div style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Fair Signal</div>
+                <div class="mono" style="font-size:1.75rem;font-weight:800;color:#ffffff;margin-top:0.25rem;" id="kpiGacsFair">0</div>
+              </div>
+              <div style="width:42px;height:42px;border-radius:50%;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;color:#f59e0b;font-size:1.1rem;font-weight:700;">
+                ⚠️
               </div>
             </div>
-            <div class="ont-kpi-card">
-              <div class="ont-kpi-icon ont-icon-yellow">⚡</div>
+
+            <!-- 3. Poor Signal -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.15rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div class="ont-kpi-title">Avg Latency</div>
-                <div class="ont-kpi-value" style="color:#f59e0b;">28 ms</div>
-                <div class="ont-kpi-sub">Port :7547 SOAP Wire</div>
+                <div style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Poor Signal</div>
+                <div class="mono" style="font-size:1.75rem;font-weight:800;color:#ffffff;margin-top:0.25rem;" id="kpiGacsPoor">0</div>
+              </div>
+              <div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:1.1rem;font-weight:700;">
+                ⚠️
+              </div>
+            </div>
+
+            <!-- 4. Offline -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.15rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Offline</div>
+                <div class="mono" style="font-size:1.75rem;font-weight:800;color:#ffffff;margin-top:0.25rem;" id="kpiGacsOffline">0</div>
+              </div>
+              <div style="width:42px;height:42px;border-radius:50%;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.1rem;font-weight:700;">
+                ⊗
               </div>
             </div>
           </div>
 
-          <!-- SEARCH TOOLBAR -->
-          <div class="ont-filter-toolbar" style="margin-bottom: 1rem;">
-            <div class="ont-search-wrap" style="flex:1;">
-              <input type="text" id="searchTr069Input" class="ont-search-input" placeholder="Search TR-069 subscriber by name, PPPoE username, mobile, MAC, or IP..." onkeyup="filterTr069Table()">
+          <!-- ONT DEVICES CARD (EXACT GACS PANEL TOOLBAR & TABLE) -->
+          <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+              <h3 style="font-size:1.1rem;font-weight:700;color:#ffffff;margin:0;">ONT Devices</h3>
             </div>
-          </div>
 
-          <!-- TR-069 EXCLUSIVE TABLE -->
-          <div class="tailadmin-table-wrap">
-            <table class="tailadmin-table ont-mgmt-table">
-              <thead>
-                <tr>
-                  <th>SUBSCRIBER</th>
-                  <th>PPPOE / IP</th>
-                  <th>MAC ADDRESS</th>
-                  <th>VENDOR / MODEL</th>
-                  <th>STATUS</th>
-                  <th>OPTICAL RX</th>
-                  <th>WIFI (2.4G &amp; 5G)</th>
-                  <th>CONNECTED CLIENTS</th>
-                  <th style="text-align: center;">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody id="tr069TableBody">
-                <!-- Populated dynamically with TR-069 devices only -->
-              </tbody>
-            </table>
+            <!-- GACS FILTER & COLUMN PILLS TOOLBAR -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+              <!-- Left: Colored Tag Badges -->
+              <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+                <span style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">📄 SN</span>
+                <span style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">🏷️ Tags</span>
+                <span style="background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">🏢 ODP</span>
+                <span style="background:rgba(20,184,166,0.15);color:#14b8a6;border:1px solid rgba(20,184,166,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">🖥️ Device</span>
+                <span style="background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">🔲 WAN</span>
+                <span style="background:rgba(249,115,22,0.15);color:#fb923c;border:1px solid rgba(249,115,22,0.3);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">⏰ Inform</span>
+                <span style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-flex;align-items:center;gap:4px;">✨ Actions</span>
+              </div>
+
+              <!-- Right: Search & Dropdowns -->
+              <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                <div style="position:relative;">
+                  <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:0.8rem;color:#64748b;">🔍</span>
+                  <input type="text" id="searchTr069Input" class="form-control" style="padding-left:30px;font-size:0.75rem;width:240px;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.12);border-radius:8px;" placeholder="Search by serial, product, tags" onkeyup="filterTr069Table()">
+                </div>
+                <select id="gacsStatusFilter" class="form-control" style="font-size:0.75rem;width:120px;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.12);border-radius:8px;" onchange="filterTr069Table()">
+                  <option value="ALL">All Status</option>
+                  <option value="ONLINE">Online</option>
+                  <option value="OFFLINE">Offline</option>
+                </select>
+                <select id="gacsOdpFilter" class="form-control" style="font-size:0.75rem;width:110px;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.12);border-radius:8px;" onchange="filterTr069Table()">
+                  <option value="ALL">All ODP</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- GACS TABLE -->
+            <div class="tailadmin-table-wrap" style="background:transparent;border:none;">
+              <table class="tailadmin-table" style="font-size:0.78rem;">
+                <thead style="background:rgba(255,255,255,0.02);">
+                  <tr>
+                    <th>SerialNumber</th>
+                    <th>Tags</th>
+                    <th>ProductClass</th>
+                    <th>ODP</th>
+                    <th>RxPower</th>
+                    <th>Status</th>
+                    <th>PPPoE</th>
+                    <th>SSID</th>
+                    <th>Device</th>
+                    <th>WanBridge</th>
+                    <th>Last Inform</th>
+                    <th style="text-align:center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tr069TableBody">
+                  <!-- Dynamically populated matching GACS rows -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- GACS PAGINATION BAR -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.08);font-size:0.75rem;color:#94a3b8;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span id="gacsPaginationText">Showing 1-1 of 1 devices</span>
+                <select class="form-control" style="width:110px;font-size:0.72rem;padding:2px 6px;background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.12);border-radius:6px;">
+                  <option value="10">10 per page</option>
+                  <option value="25">25 per page</option>
+                  <option value="50">50 per page</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:0.25rem;align-items:center;">
+                <button class="btn-outline" style="padding:4px 10px;font-size:0.72rem;border-radius:6px;">Previous</button>
+                <button class="btn-primary" style="padding:4px 10px;font-size:0.72rem;border-radius:6px;background:#3b82f6;">1</button>
+                <button class="btn-outline" style="padding:4px 10px;font-size:0.72rem;border-radius:6px;">Next</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1668,142 +1737,202 @@
           </form>
         </div>
 
-        <!-- TAB 2: WIFI CONFIGURATION (MULTI-SSID & FREQUENCY) -->
+        <!-- TAB 2: WIFI CONFIGURATION (EXACT GACS 4-CARD 2x2 GRID MATCHING SCREENSHOT) -->
         <div class="mtab-content" id="mtab-wifi">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-            <strong style="color:#ffffff;font-size:0.9rem;">📶 Broadcast Wireless SSIDs (2.4GHz &amp; 5GHz Dual-Band)</strong>
-            <button type="button" class="btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem;" onclick="generateWifiQrCode()">
-              📱 WiFi QR Connect
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#ffffff;margin:0;">SSID Configuration</h3>
+            <button type="button" class="btn-primary" style="background:#7c3aed;border-color:#6d28d9;padding:0.4rem 1rem;font-size:0.78rem;display:inline-flex;align-items:center;gap:6px;border-radius:8px;" onclick="quickSyncCurrentDevice()" title="Summon & Sync latest WiFi parameters from ONT">
+              <span>🔄</span> <strong>Summon</strong>
             </button>
           </div>
 
-          <div class="tailadmin-table-wrap" style="margin-bottom: 1.5rem;">
-            <table class="tailadmin-table" style="font-size:0.78rem;">
-              <thead>
-                <tr>
-                  <th>Index</th>
-                  <th>Frequency Band</th>
-                  <th>SSID Name</th>
-                  <th>Status</th>
-                  <th>Standard</th>
-                  <th>Tx Power</th>
-                  <th>Security Mode</th>
-                  <th>Hide SSID</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>1</td>
-                  <td><span style="color:#38bdf8;font-weight:700;">2.4 GHz (Primary)</span></td>
-                  <td><strong id="wlanRow1Ssid" style="color:#ffffff;">Rudra_Fiber_2.4G</strong></td>
-                  <td><span class="tailadmin-badge success">Active (Up)</span></td>
-                  <td>802.11 b/g/n</td>
-                  <td>100% (20dBm)</td>
-                  <td>WPA2-PSK (AES)</td>
-                  <td><span class="tailadmin-badge primary">Broadcast</span></td>
-                </tr>
-                <tr>
-                  <td>2</td>
-                  <td><span style="color:#a855f7;font-weight:700;">5 GHz (High Speed)</span></td>
-                  <td><strong id="wlanRow2Ssid" style="color:#ffffff;">Rudra_Fiber_5G</strong></td>
-                  <td><span class="tailadmin-badge success">Active (Up)</span></td>
-                  <td>802.11 a/n/ac/ax</td>
-                  <td>100% (23dBm)</td>
-                  <td>WPA2/WPA3-Personal</td>
-                  <td><span class="tailadmin-badge primary">Broadcast</span></td>
-                </tr>
-                <tr>
-                  <td>3</td>
-                  <td><span style="color:#64748b;font-weight:600;">2.4 GHz (Guest)</span></td>
-                  <td><span style="color:#94a3b8;" id="wlanRow3Ssid">Rudra_Guest_2.4G</span></td>
-                  <td><span class="tailadmin-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;">Disabled</span></td>
-                  <td>802.11 b/g/n</td>
-                  <td>50%</td>
-                  <td>WPA2-PSK</td>
-                  <td><span>Hidden</span></td>
-                </tr>
-                <tr>
-                  <td>4</td>
-                  <td><span style="color:#64748b;font-weight:600;">5 GHz (Guest)</span></td>
-                  <td><span style="color:#94a3b8;" id="wlanRow4Ssid">Rudra_Guest_5G</span></td>
-                  <td><span class="tailadmin-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;">Disabled</span></td>
-                  <td>802.11 a/n/ac</td>
-                  <td>50%</td>
-                  <td>WPA2-PSK</td>
-                  <td><span>Hidden</span></td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- 4-CARD 2x2 SSID GRID -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:1.25rem;margin-bottom:1.5rem;">
+            <!-- CARD 1: SSID 1 -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;position:relative;" id="gacsSsidCard1">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div style="width:40px;height:40px;border-radius:10px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;color:#3b82f6;font-size:1.2rem;">
+                    📶
+                  </div>
+                  <div>
+                    <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">SSID 1</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;" id="gacsSsid1Clients">👥 0 Connected</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge success" id="gacsSsid1ActiveBadge" style="font-size:0.7rem;">● Active</span>
+              </div>
+
+              <div style="margin-bottom:0.75rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                <div class="mono" style="font-size:0.9rem;font-weight:700;color:#ffffff;" id="gacsSsid1NameVal">Rudra_Fiber_2.4G</div>
+              </div>
+
+              <div style="margin-bottom:1.25rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                <div class="mono" style="font-size:0.85rem;color:#cbd5e1;" id="gacsSsid1SecVal">WPAand11i (WPA2-PSK)</div>
+              </div>
+
+              <div style="text-align:right;">
+                <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.4rem 1rem;font-size:0.78rem;border-radius:8px;" onclick="openQuickWifiEditModal(1)">
+                  ✏️ Edit Configuration
+                </button>
+              </div>
+            </div>
+
+            <!-- CARD 2: SSID 2 -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;position:relative;" id="gacsSsidCard2">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div style="width:40px;height:40px;border-radius:10px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;color:#a855f7;font-size:1.2rem;">
+                    📶
+                  </div>
+                  <div>
+                    <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">SSID 2 (5GHz)</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;" id="gacsSsid2Clients">👥 0 Connected</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge" id="gacsSsid2ActiveBadge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.7rem;">● Inactive</span>
+              </div>
+
+              <div style="margin-bottom:0.75rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                <div class="mono" style="font-size:0.9rem;font-weight:700;color:#ffffff;" id="gacsSsid2NameVal">WIFI2.4G_01</div>
+              </div>
+
+              <div style="margin-bottom:1.25rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                <div class="mono" style="font-size:0.85rem;color:#cbd5e1;" id="gacsSsid2SecVal">WPAand11i</div>
+              </div>
+
+              <div style="text-align:right;">
+                <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.4rem 1rem;font-size:0.78rem;border-radius:8px;" onclick="openQuickWifiEditModal(2)">
+                  ✏️ Edit Configuration
+                </button>
+              </div>
+            </div>
+
+            <!-- CARD 3: SSID 3 -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;position:relative;" id="gacsSsidCard3">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div style="width:40px;height:40px;border-radius:10px;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.2rem;">
+                    📶
+                  </div>
+                  <div>
+                    <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">SSID 3</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;">👥 0 Connected</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.7rem;">● Inactive</span>
+              </div>
+
+              <div style="margin-bottom:0.75rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                <div class="mono" style="font-size:0.9rem;font-weight:700;color:#ffffff;" id="gacsSsid3NameVal">WIFI2.4G_02</div>
+              </div>
+
+              <div style="margin-bottom:1.25rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                <div class="mono" style="font-size:0.85rem;color:#cbd5e1;">WPAand11i</div>
+              </div>
+
+              <div style="text-align:right;">
+                <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.4rem 1rem;font-size:0.78rem;border-radius:8px;" onclick="openQuickWifiEditModal(3)">
+                  ✏️ Edit Configuration
+                </button>
+              </div>
+            </div>
+
+            <!-- CARD 4: SSID 4 -->
+            <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;position:relative;" id="gacsSsidCard4">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div style="width:40px;height:40px;border-radius:10px;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.2rem;">
+                    📶
+                  </div>
+                  <div>
+                    <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">SSID 4</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;">👥 0 Connected</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.7rem;">● Inactive</span>
+              </div>
+
+              <div style="margin-bottom:0.75rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                <div class="mono" style="font-size:0.9rem;font-weight:700;color:#ffffff;" id="gacsSsid4NameVal">WIFI2.4G_03</div>
+              </div>
+
+              <div style="margin-bottom:1.25rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                <div class="mono" style="font-size:0.85rem;color:#cbd5e1;">WPAand11i</div>
+              </div>
+
+              <div style="text-align:right;">
+                <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.4rem 1rem;font-size:0.78rem;border-radius:8px;" onclick="openQuickWifiEditModal(4)">
+                  ✏️ Edit Configuration
+                </button>
+              </div>
+            </div>
           </div>
 
-          <form id="formModalWifi">
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label class="form-label">2.4GHz Primary WiFi SSID Name:</label>
-                <input type="text" id="wlan24Ssid" class="form-control mono" placeholder="VRV_Fiber_2.4G">
-              </div>
-              <div class="form-group">
-                <label class="form-label">2.4GHz WPA2 Passphrase / Secret:</label>
-                <div style="display:flex;gap:0.4rem;">
-                  <input type="text" id="wlan24Password" class="form-control mono" placeholder="e.g. 12345678" style="font-weight:700;color:#10b981;">
-                  <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('wlan24Password')" title="Toggle visibility">👁️</button>
+          <!-- QUICK INLINE EDIT MODAL / FORM -->
+          <div id="gacsWifiEditDrawer" style="display:none;background:rgba(15,23,42,0.95);border:1px solid #3b82f6;border-radius:12px;padding:1.5rem;margin-top:1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <strong style="color:#38bdf8;font-size:0.95rem;" id="gacsWifiEditTitle">✏️ Edit SSID 1 Configuration</strong>
+              <button type="button" class="btn-outline" style="padding:2px 8px;" onclick="document.getElementById('gacsWifiEditDrawer').style.display='none'">✕ Close</button>
+            </div>
+
+            <form id="formGacsWifiEdit" onsubmit="event.preventDefault(); window.saveGacsWifiConfig(); return false;">
+              <input type="hidden" id="gacsEditSsidIndex" value="1">
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Network Name (SSID):</label>
+                  <input type="text" id="gacsEditSsidName" class="form-control mono" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">WPA/WPA2 Passphrase / Key:</label>
+                  <div style="display:flex;gap:0.4rem;">
+                    <input type="text" id="gacsEditSsidPassword" class="form-control mono" style="font-weight:700;color:#10b981;" required>
+                    <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('gacsEditSsidPassword')">👁️</button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div id="wlan5gNotSupportedNotice" style="display:none;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);padding:0.75rem 1rem;border-radius:6px;margin:0.75rem 0;color:#94a3b8;font-size:0.8rem;">
-              ℹ️ <strong>Single-Band (2.4GHz) ONT:</strong> 5GHz High-Speed Radio is not supported on this hardware model.
-            </div>
-
-            <div id="wlan5gConfigSection" class="form-grid-2">
-              <div class="form-group">
-                <label class="form-label">5GHz High-Speed WiFi SSID Name:</label>
-                <input type="text" id="wlan5Ssid" class="form-control mono" placeholder="VRV_Fiber_5G">
-              </div>
-              <div class="form-group">
-                <label class="form-label">5GHz WPA2/WPA3 Passphrase / Secret:</label>
-                <div style="display:flex;gap:0.4rem;">
-                  <input type="text" id="wlan5Password" class="form-control mono" placeholder="e.g. 12345678" style="font-weight:700;color:#38bdf8;">
-                  <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('wlan5Password')" title="Toggle visibility">👁️</button>
+              <div class="form-grid-3" style="margin-top:0.75rem;">
+                <div class="form-group">
+                  <label class="form-label">Security Mode:</label>
+                  <select id="gacsEditSsidSecurity" class="form-control">
+                    <option value="WPAand11i">WPAand11i (WPA / WPA2-PSK)</option>
+                    <option value="WPA2-PSK">WPA2-PSK (AES)</option>
+                    <option value="11i">11i (WPA2 Only)</option>
+                    <option value="Basic">Basic (Open / WEP)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Radio Status:</label>
+                  <select id="gacsEditSsidEnable" class="form-control">
+                    <option value="1">Enabled (Active)</option>
+                    <option value="0">Disabled (Inactive)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Broadcast SSID:</label>
+                  <select id="gacsEditSsidHide" class="form-control">
+                    <option value="0">Broadcast (Visible)</option>
+                    <option value="1">Hidden (Hide SSID)</option>
+                  </select>
                 </div>
               </div>
-            </div>
 
-            <div class="form-grid-3" style="margin-top:0.75rem;">
-              <div class="form-group">
-                <label class="form-label">2.4GHz Channel:</label>
-                <select id="wlan24Channel" class="form-control">
-                  <option value="Auto">Auto (Smart Interference Avoidance)</option>
-                  <option value="1">Channel 1 (2.412 GHz)</option>
-                  <option value="6" selected>Channel 6 (2.437 GHz)</option>
-                  <option value="11">Channel 11 (2.462 GHz)</option>
-                </select>
+              <div style="text-align:right;margin-top:1.25rem;">
+                <button type="submit" class="btn-primary" style="background:#2563eb;padding:0.6rem 2rem;font-weight:700;">
+                  💾 Save &amp; Push to ONT via TR-069
+                </button>
               </div>
-              <div class="form-group">
-                <label class="form-label">5GHz Channel / Bandwidth:</label>
-                <select id="wlan5Channel" class="form-control">
-                  <option value="36">Channel 36 (80 MHz Wideband)</option>
-                  <option value="40">Channel 40</option>
-                  <option value="44">Channel 44</option>
-                  <option value="149">Channel 149 (High Power)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Transmit Laser/RF Power:</label>
-                <select id="wlanTxPower" class="form-control">
-                  <option value="100">100% (Maximum Coverage)</option>
-                  <option value="75">75%</option>
-                  <option value="50">50% (Eco Power)</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="text-align: right; margin-top: 1.25rem;">
-              <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem;">
-                💾 Update WiFi Parameters via TR-069
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
 
         <!-- TAB 3: CONNECTED CLIENTS & HOST MANAGEMENT -->
