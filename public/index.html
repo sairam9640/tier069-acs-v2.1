@@ -1,0 +1,2991 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRV ACS — Enterprise Telecom & TR-069 Management Platform</title>
+  <meta name="description" content="VRV ACS Enterprise TR-069 Carrier Suite with TailAdmin NOC Dashboard, Optical Laser Telemetry, ZTP Auto-Provisioning, and Outside Plant GIS.">
+  <link rel="icon" type="image/png" href="/images/vrv-acs-icon.png">
+
+  <!-- Inter & JetBrains Mono Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet GIS Map Engine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- TailAdmin React Dashboard Design System -->
+  <link rel="stylesheet" href="/app.css?v=6.0.0">
+</head>
+<body>
+
+  <!-- =========================================================================
+       1. OPERATOR AUTHENTICATION MODAL (TailAdmin 2-Step WhatsApp OTP Login)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="loginOverlay" style="display: flex; z-index: 99999;">
+    <div class="modal-box" style="max-width: 440px; padding: 2.25rem; background: var(--bg-boxdark); border: 1px solid var(--border);">
+      <div style="text-align: center; margin-bottom: 1.75rem;">
+        <img src="/images/vrv-acs-emblem.png" alt="VRV ACS" style="width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 1rem auto; box-shadow: 0 0 25px rgba(60, 80, 224, 0.45); display: block;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em; margin-bottom: 0.25rem;" id="loginBrandHeader">VRV ACS</h2>
+        <div style="font-size: 0.85rem; color: var(--text-body);">Operator NOC Console Sign In (WhatsApp 2FA)</div>
+      </div>
+
+      <div id="loginAlert" style="display:none;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger);border-radius:4px;padding:0.75rem;font-size:0.85rem;margin-bottom:1.25rem;text-align:center;font-weight:600;"></div>
+      <div id="loginSuccess" style="display:none;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:0.75rem;font-size:0.85rem;margin-bottom:1.25rem;text-align:center;font-weight:600;"></div>
+
+      <!-- STEP 1: REGISTERED OPERATOR MOBILE NUMBER ONLY (PASSWORDLESS) -->
+      <form id="formLogin" onsubmit="event.preventDefault(); window.doAdminLogin(); return false;">
+        <div id="stepOpCredentials">
+          <div class="form-group">
+            <label class="form-label">Registered Operator Mobile Number:</label>
+            <input type="tel" id="loginUser" class="form-control mono" placeholder="" required autocomplete="tel" autofocus>
+          </div>
+
+          <button type="submit" class="btn-primary" style="width: 100%; padding: 0.75rem; margin-top: 0.5rem;" id="btnLoginSubmit">
+            <span>📱 Send WhatsApp Login OTP</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- STEP 2: WHATSAPP OTP VERIFICATION -->
+      <form id="formOpOtp" style="display:none;" onsubmit="event.preventDefault(); window.doVerifyOpOtp(); return false;">
+        <input type="hidden" id="opChallengeToken">
+        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:0.75rem;margin-bottom:1rem;text-align:center;">
+          <div style="font-size:0.75rem;color:#94a3b8;">OTP Sent to WhatsApp Number:</div>
+          <div style="font-weight:700;color:#10b981;font-size:0.88rem;margin-top:0.25rem;" id="opTargetPhoneDisplay"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="text-align:center;display:block;">Enter 6-Digit WhatsApp OTP</label>
+          <input type="text" id="opLoginOtp" class="form-control mono" maxlength="6" placeholder="123456" style="text-align:center;font-size:1.5rem;letter-spacing:6px;font-weight:800;" required autocomplete="one-time-code">
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;padding:0.75rem;margin-top:0.5rem;" id="btnOpVerifySubmit">
+          <span>🔓 Verify WhatsApp OTP & Access NOC</span>
+        </button>
+        <div style="text-align:center;margin-top:0.75rem;">
+          <a href="javascript:void(0)" onclick="resetOpLoginForm()" style="font-size:0.75rem;color:#94a3b8;text-decoration:none;">← Back to Login</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. PRIMARY APPLICATION SHELL (Strictly hidden until authenticated)
+       ========================================================================= -->
+  <div class="tailadmin-shell" id="appRoot" style="display: none !important;">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="tailadmin-sidebar" id="mainSidebar">
+      <div class="sidebar-brand-box">
+        <img src="/images/vrv-acs-horizontal.png" alt="VRV ACS Platform" class="sidebar-logo-img" onerror="this.src='/images/vrv-acs-icon.png'">
+        <button class="btn-icon-action" style="display:none;" id="btnSidebarClose" onclick="toggleSidebar()">✕</button>
+      </div>
+
+      <div class="sidebar-nav-scroll">
+        <!-- GROUP 1: MENU -->
+        <div class="sidebar-group-title">MAIN MENU</div>
+        <ul class="sidebar-nav-list">
+          <li>
+            <a class="sidebar-nav-item active nav-tab-btn" data-tab="dashboard">
+              <span class="sidebar-nav-icon">📊</span>
+              <span>Performance Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="devices">
+              <span class="sidebar-nav-icon">📶</span>
+              <span>All OLT Fleet Inventory</span>
+              <span class="sidebar-badge" id="tabBadgeDevices">71</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="tr069">
+              <span class="sidebar-nav-icon">📡</span>
+              <span>TR-069 Active Fleet</span>
+              <span class="sidebar-badge" style="background:#10b981;color:#fff;" id="tabBadgeTr069">11</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="optical">
+              <span class="sidebar-nav-icon">⚡</span>
+              <span>Optical Power Health</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="technicians">
+              <span class="sidebar-nav-icon">👨‍🔧</span>
+              <span>Field Technicians</span>
+              <span class="sidebar-badge" id="tabBadgeTechs">0</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="whatsapp-chats">
+              <span class="sidebar-nav-icon">💬</span>
+              <span>WhatsApp Live Chats</span>
+              <span class="sidebar-badge" style="background:#10b981;color:#fff;" id="tabBadgeWaChats">0</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="map">
+              <span class="sidebar-nav-icon">🗺️</span>
+              <span>GIS Outside Plant (FDP)</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="logs">
+              <span class="sidebar-nav-icon">📜</span>
+              <span>Live CWMP Informs</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item nav-tab-btn" data-tab="olt">
+              <span class="sidebar-nav-icon">🏢</span>
+              <span>OLT Management & Uplink</span>
+              <span class="sidebar-badge" style="background:#3b82f6;color:#fff;" id="tabBadgeOlts">1</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 2: OPERATIONS & TOOLS -->
+        <div class="sidebar-group-title">OPERATIONS & TOOLS</div>
+        <ul class="sidebar-nav-list">
+          <li>
+            <a class="sidebar-nav-item" onclick="openWhatsAppModal()">
+              <span class="sidebar-nav-icon">📱</span>
+              <span>WhatsApp Outage Alerts</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item" onclick="openZtpModal()">
+              <span class="sidebar-nav-icon">⚡</span>
+              <span>Zero-Touch Provisioning</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item" onclick="openAddOltModal()">
+              <span class="sidebar-nav-icon">🏢</span>
+              <span>GPON / EPON OLT Uplink</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 3: CONNECTED APPS -->
+        <div class="sidebar-group-title">CONNECTED APPS</div>
+        <ul class="sidebar-nav-list">
+          <li>
+            <a class="sidebar-nav-item" href="/technician/" target="_blank">
+              <span class="sidebar-nav-icon">🔧</span>
+              <span>Field Technician App</span>
+            </a>
+          </li>
+          <li>
+            <a class="sidebar-nav-item" href="/customer/" target="_blank">
+              <span class="sidebar-nav-icon">📱</span>
+              <span>Subscriber Self-Care App</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- SIDEBAR PROFILE FOOTER -->
+      <div class="sidebar-footer">
+        <div class="sidebar-user-pill">
+          <div class="sidebar-user-avatar" id="sidebarAvatarLetter">R</div>
+          <div>
+            <span class="sidebar-user-name" id="sidebarOperatorName">Rudra FiberNet</span>
+            <span class="sidebar-user-role">NOC Admin</span>
+          </div>
+        </div>
+        <button class="btn-icon-action" onclick="logoutAdminSession()" title="Logout Session">
+          🚪
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <div class="tailadmin-content-area">
+
+      <!-- TOP HEADER -->
+      <header class="tailadmin-header">
+        <div class="header-search-wrap">
+          <span style="font-size:1.1rem;color:var(--text-body);">🔍</span>
+          <input type="text" id="headerSearchInput" class="header-search-input" placeholder="Type to search subscriber name, phone, PON serial, MAC, IP..." onkeyup="handleGlobalSearch(this.value)">
+        </div>
+
+        <div class="header-actions-group">
+          <span class="header-status-badge">
+            <span class="pulse-led"></span> CWMP Port 7547 Online
+          </span>
+
+          <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);padding:0.35rem 0.75rem;border-radius:20px;display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:#38bdf8;" title="10-Minute Inactivity Auto-Logout Timer">
+            <span>⏱️</span> <strong id="opSessionCountdown" class="mono">10:00</strong>
+          </div>
+
+          <button class="header-icon-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+            <span id="themeIcon">🌙</span>
+          </button>
+
+          <div class="sidebar-user-pill" style="cursor:pointer;" onclick="openChangePasswordModal()" title="Operator Settings">
+            <div class="sidebar-user-avatar" style="width:32px;height:32px;font-size:0.8rem;" id="headerAvatarLetter">R</div>
+            <span class="sidebar-user-name" style="font-size:0.85rem;" id="headerAdminLabel">Rudra Admin</span>
+          </div>
+
+          <button class="btn-primary" style="background:#ef4444;border-color:#dc2626;padding:0.4rem 0.85rem;font-size:0.78rem;" onclick="logoutAdminSession()" title="Sign Out of NOC">
+            🚪 Sign Out
+          </button>
+        </div>
+      </header>
+
+      <!-- MAIN VIEWPORT -->
+      <main class="tailadmin-main">
+
+        <!-- =====================================================================
+             VIEW 1: PERFORMANCE DASHBOARD (TailAdmin Layout)
+             ===================================================================== -->
+        <section class="tab-view active" id="view-dashboard">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">Performance Overview — <span id="dashTenantName" style="color:var(--primary);">Rudra FiberNet</span></h2>
+              <div class="page-subtitle mono" id="dashLiveClock">(2026-08-18 10:02:02) • Real-Time Carrier Telemetry</div>
+            </div>
+            <button class="btn-primary" onclick="loadDashboardData()">
+              🔄 Refresh Analytics
+            </button>
+          </div>
+
+          <!-- TOP 4 TAILADMIN STAT CARDS -->
+          <div class="tailadmin-card-grid">
+          <!-- TOP 4 TAILADMIN STAT CARDS -->
+          <div class="tailadmin-card-grid">
+            <div class="tailadmin-stat-card">
+              <div class="stat-icon-circle stat-icon-blue">🌐</div>
+              <div class="stat-number" id="kpiWorkingConns">--</div>
+              <div class="stat-footer-row">
+                <span class="stat-label">Working Connections</span>
+                <span class="stat-trend-badge trend-up">Carrier Configured</span>
+              </div>
+            </div>
+
+            <div class="tailadmin-stat-card">
+              <div class="stat-icon-circle stat-icon-purple">📡</div>
+              <div class="stat-number" id="kpiReportingCpes">--</div>
+              <div class="stat-footer-row">
+                <span class="stat-label">Reporting CPEs (24h)</span>
+                <span class="stat-trend-badge trend-up">Active Informs</span>
+              </div>
+            </div>
+
+            <div class="tailadmin-stat-card">
+              <div class="stat-icon-circle stat-icon-green">🟢</div>
+              <div class="stat-number" id="kpiActiveCpes">--</div>
+              <div class="stat-footer-row">
+                <span class="stat-label">Active CPEs Online</span>
+                <span class="stat-trend-badge trend-up">Live Connected</span>
+              </div>
+            </div>
+
+            <div class="tailadmin-stat-card">
+              <div class="stat-icon-circle stat-icon-yellow">📊</div>
+              <div class="stat-number" id="kpiOnboardPercent">--%</div>
+              <div class="stat-footer-row">
+                <span class="stat-label">Onboard Percentage</span>
+                <span class="stat-trend-badge trend-up">Fleet Healthy</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 CARRIER OLT & TR-069 LIVE KPI MATRICES -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem;">
+            <!-- Matrix 1: Physical OLT Registered ONTs -->
+            <div class="tailadmin-box" style="margin-bottom: 0;">
+              <div class="box-header-row">
+                <div class="box-title">🖧 Physical OLT Registered ONTs</div>
+                <span class="tailadmin-badge success" id="badgeOltRegistered">-- ONTs</span>
+              </div>
+              <div style="padding: 0.5rem 0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                  <span style="font-size:0.78rem;color:#94a3b8;">OLT Headend:</span>
+                  <strong style="color:#38bdf8;font-size:0.85rem;" class="mono" id="dashOltHeadendLabel">--</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:0.6rem 0.75rem;margin-bottom:0.5rem;">
+                  <span style="font-size:0.75rem;color:#cbd5e1;">🟢 Active Laser (Online):</span>
+                  <strong class="mono" style="color:#10b981;font-size:1rem;" id="dashOltOnlineOnus">--</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:0.6rem 0.75rem;">
+                  <span style="font-size:0.75rem;color:#cbd5e1;">🔴 Inactive / Laser Cut:</span>
+                  <strong class="mono" style="color:#ef4444;font-size:1rem;" id="dashOltOfflineOnus">--</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Matrix 2: TR-069 Active vs Pending ONTs -->
+            <div class="tailadmin-box" style="margin-bottom: 0;">
+              <div class="box-header-row">
+                <div class="box-title">📡 TR-069 CWMP Communication</div>
+                <span class="tailadmin-badge primary" id="badgeTr069Status">Port :80 / :7547</span>
+              </div>
+              <div style="padding: 0.5rem 0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                  <span style="font-size:0.78rem;color:#94a3b8;">CWMP Session Status:</span>
+                  <strong style="color:#a855f7;font-size:0.85rem;" class="mono" id="dashCwmpSessionLabel">Ready</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:6px;padding:0.6rem 0.75rem;margin-bottom:0.5rem;">
+                  <span style="font-size:0.75rem;color:#cbd5e1;">⚡ TR-069 Active Sessions:</span>
+                  <strong class="mono" style="color:#38bdf8;font-size:1rem;" id="dashTr069ActiveCount">--</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:6px;padding:0.6rem 0.75rem;">
+                  <span style="font-size:0.75rem;color:#cbd5e1;">⏳ TR-069 Pending / Informs:</span>
+                  <strong class="mono" style="color:#f59e0b;font-size:1rem;" id="dashTr069PendingCount">--</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Matrix 3: OLT PON Ports & Uplink Distribution -->
+            <div class="tailadmin-box" style="margin-bottom: 0;">
+              <div class="box-header-row">
+                <div class="box-title">🏢 OLT PON Distribution</div>
+                <span class="tailadmin-badge success" id="dashPonPortsBadge">PON Ports</span>
+              </div>
+              <div style="padding: 0.5rem 0; font-size: 0.78rem;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;">
+                  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
+                    <div style="color:#94a3b8;font-size:0.7rem;">EPON 0/1:</div>
+                    <strong class="mono" style="color:#38bdf8;font-size:0.9rem;" id="dashPon1Count">--</strong>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
+                    <div style="color:#94a3b8;font-size:0.7rem;">EPON 0/2:</div>
+                    <strong class="mono" style="color:#38bdf8;font-size:0.9rem;" id="dashPon2Count">--</strong>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
+                    <div style="color:#94a3b8;font-size:0.7rem;">EPON 0/3:</div>
+                    <strong class="mono" style="color:#38bdf8;font-size:0.9rem;" id="dashPon3Count">--</strong>
+                  </div>
+                  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
+                    <div style="color:#94a3b8;font-size:0.7rem;">EPON 0/4:</div>
+                    <strong class="mono" style="color:#38bdf8;font-size:0.9rem;" id="dashPon4Count">--</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Matrix 4: Global Optical Health Levels -->
+            <div class="tailadmin-box" style="margin-bottom: 0;">
+              <div class="box-header-row">
+                <div class="box-title">⚡ Optical Power Health</div>
+                <span class="tailadmin-badge warning">Rx Summary</span>
+              </div>
+              <div style="padding: 0.5rem 0; font-size: 0.8rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span style="color:#cbd5e1;">🟢 Optimal (-15 to -24 dBm):</span>
+                  <strong class="mono" style="color:#10b981;" id="dashOptOptimal">--</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span style="color:#cbd5e1;">🟡 Degraded (-25 to -27 dBm):</span>
+                  <strong class="mono" style="color:#f59e0b;" id="dashOptWarning">--</strong>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span style="color:#cbd5e1;">🔴 Critical / Cuts (< -27 dBm):</span>
+                  <strong class="mono" style="color:#ef4444;" id="dashOptCritical">--</strong>
+                </div>
+                <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:0.4rem;display:flex;justify-content:space-between;color:#94a3b8;font-size:0.72rem;">
+                  <span>Avg Fleet Rx: <strong class="mono" style="color:#38bdf8;" id="dashOptAvgRx">-- dBm</strong></span>
+                  <span>Distance: <strong class="mono" style="color:#38bdf8;" id="dashOptAvgDist">-- m</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <!-- CWMP ENGINE LIVE PERFORMANCE & REAL-TIME STREAM -->
+          <div class="tailadmin-box" style="margin-bottom: 1.75rem;">
+            <div class="box-header-row">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span style="font-size:1.3rem;">⚡</span>
+                <div>
+                  <div class="box-title" style="margin:0;">CWMP Engine Live Performance & Real-Time Informs</div>
+                  <div style="font-size:0.75rem;color:var(--text-body);">Listening on Carrier Port <strong class="mono" style="color:#38bdf8;">:7547</strong> (SOAP Wire) • 5-Minute Informs Active</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <span class="tailadmin-badge success" style="display:inline-flex;align-items:center;gap:0.4rem;">
+                  <span class="pulse-dot"></span> 🟢 TR-069 ENGINE LIVE
+                </span>
+              </div>
+            </div>
+
+            <div class="tailadmin-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.25rem;">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">CWMP Listening URL</div>
+                <div class="mono" id="dashCwmpUrlDisplay" style="font-size:0.85rem;color:#38bdf8;font-weight:700;margin-top:0.3rem;">--</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Average CWMP Latency</div>
+                <div class="mono" style="font-size:1.1rem;color:#10b981;font-weight:800;margin-top:0.2rem;" id="statCwmpLatency">28 ms</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Periodic Inform Interval</div>
+                <div class="mono" style="font-size:1.1rem;color:#f59e0b;font-weight:800;margin-top:0.2rem;">300s (5 Mins)</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Total Informs Processed</div>
+                <div class="mono" style="font-size:1.1rem;color:#a855f7;font-weight:800;margin-top:0.2rem;" id="statCwmpInforms">2,840</div>
+              </div>
+            </div>
+
+            <!-- LIVE CWMP PACKET FEED TABLE -->
+            <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:1rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                <strong style="font-size:0.82rem;color:#ffffff;">📡 Real-Time CWMP Inform & Parameter Stream</strong>
+                <span class="mono" style="font-size:0.72rem;color:#94a3b8;">Auto-refreshing every 3s</span>
+              </div>
+              <div class="tailadmin-table-wrap" style="max-height:220px;overflow-y:auto;">
+                <table class="tailadmin-table" style="font-size:0.78rem;">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Subscriber ONT</th>
+                      <th>Event Code</th>
+                      <th>Laser Rx</th>
+                      <th>Tx Power</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashCwmpStreamBody">
+                    <!-- Dynamically populated from recent logs -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- OLT UPLINK & HEADEND TELEMETRY WIDGET -->
+          <div class="tailadmin-box" style="margin-bottom: 1.75rem;">
+            <div class="box-header-row">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span style="font-size:1.3rem;">🏢</span>
+                <div>
+                  <div class="box-title" style="margin:0;">GPON / EPON OLT Uplink & Physical Headend Telemetry</div>
+                  <div style="font-size:0.75rem;color:var(--text-body);" id="dashOltSubtitle">Syrotech EPON Core Headend • Host: <strong class="mono" style="color:#38bdf8;">172.18.18.3:22</strong> (SSH Safe Read)</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <span class="tailadmin-badge success" id="dashOltBadge" style="display:inline-flex;align-items:center;gap:0.4rem;">
+                  <span class="pulse-dot"></span> 🟢 OLT UPLINK ACTIVE
+                </span>
+                <button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.75rem;" onclick="switchTab('olt')">
+                  🏢 Open OLT Manager
+                </button>
+              </div>
+            </div>
+
+            <div class="tailadmin-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 0.5rem;">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
+                <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">OLT CPU / Memory</div>
+                <div class="mono" style="font-size:1rem;color:#38bdf8;font-weight:700;margin-top:0.2rem;" id="dashOltCpuMem">12% / 34%</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
+                <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">Core Temperature</div>
+                <div class="mono" style="font-size:1rem;color:#10b981;font-weight:700;margin-top:0.2rem;" id="dashOltTemp">41.8 °C</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
+                <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">Active PON Fleet</div>
+                <div class="mono" style="font-size:1rem;color:#a855f7;font-weight:700;margin-top:0.2rem;" id="dashOltOnusCount">5 ONUs (4 PONs)</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
+                <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">TR-069 + OLT Sync</div>
+                <div class="mono" style="font-size:1rem;color:#10b981;font-weight:700;margin-top:0.2rem;" id="dashOltSyncStatus">🟢 100% Synced</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 2: ONT MANAGEMENT (CPE FLEET & SUBSCRIBER INVENTORY)
+             ===================================================================== -->
+        <section class="tab-view" id="view-devices">
+          <!-- TOP BREADCRUMB & HEADER -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+            <div>
+              <div style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:0.25rem;">
+                <span style="color:#38bdf8;">Home</span> <span style="color:#475569;">&gt;</span> <span>ONT Management</span>
+              </div>
+              <h2 style="font-size:1.5rem;font-weight:800;color:#ffffff;margin:0;letter-spacing:-0.02em;">ONT Management</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <button class="btn-ont-refresh" style="background:#10b981;border-color:#10b981;font-weight:700;display:inline-flex;align-items:center;gap:5px;" onclick="openCreateCustomerModal()">
+                <span>➕</span> <span>Add Subscriber</span>
+              </button>
+              <select id="headerOltSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All OLT Devices</option>
+              </select>
+              <select id="headerStatusSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All Status</option>
+                <option value="online">Online</option>
+                <option value="weak">Weak Signal</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 5 TOP KPI CARDS (MATCHING SCREENSHOT) -->
+          <div class="ont-kpi-grid">
+            <!-- 1. Total ONTs -->
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-blue">🖧</div>
+              <div>
+                <div class="ont-kpi-title">Total ONTs</div>
+                <div class="ont-kpi-value" id="kpiTotalOnts">0</div>
+                <div class="ont-kpi-sub">All Registered ONTs</div>
+              </div>
+            </div>
+
+            <!-- 2. Online ONTs -->
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-green">🛡️</div>
+              <div>
+                <div class="ont-kpi-title">Online ONTs</div>
+                <div class="ont-kpi-value" id="kpiOnlineOnts" style="color:#10b981;">0</div>
+                <div class="ont-kpi-sub" id="kpiOnlinePct" style="color:#10b981;">0% Online</div>
+              </div>
+            </div>
+
+            <!-- 3. Offline ONTs -->
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-amber">⚠️</div>
+              <div>
+                <div class="ont-kpi-title">Offline ONTs</div>
+                <div class="ont-kpi-value" id="kpiOfflineOnts" style="color:#f59e0b;">0</div>
+                <div class="ont-kpi-sub" id="kpiOfflinePct" style="color:#ef4444;">0% Offline</div>
+              </div>
+            </div>
+
+            <!-- 4. TR-069 Pending -->
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-purple">🔄</div>
+              <div>
+                <div class="ont-kpi-title">TR-069 Pending</div>
+                <div class="ont-kpi-value" id="kpiTr069Pending" style="color:#a855f7;">0</div>
+                <div class="ont-kpi-sub">Pending Communication</div>
+              </div>
+            </div>
+
+            <!-- 5. Active Alarms -->
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-teal">📈</div>
+              <div>
+                <div class="ont-kpi-title">Active Alarms</div>
+                <div class="ont-kpi-value" id="kpiActiveAlarms" style="color:#14b8a6;">0</div>
+                <div class="ont-kpi-sub">Require Attention</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- HORIZONTAL FILTER & ACTION TOOLBAR (MATCHING SCREENSHOT) -->
+          <div class="ont-filter-bar">
+            <div class="ont-filter-inputs">
+              <div class="ont-search-wrap">
+                <span class="ont-search-icon">🔍</span>
+                <input type="text" id="searchInput" class="ont-search-input" placeholder="Search by ONU ID / Serial / MAC / Port..." onkeyup="filterDevicesList()">
+              </div>
+              <select id="filterOltSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All OLT Devices</option>
+              </select>
+              <select id="filterPonSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All PON Ports</option>
+                <option value="1/1">1/1 (EPON)</option>
+                <option value="1/2">1/2 (EPON)</option>
+                <option value="1/3">1/3 (EPON)</option>
+                <option value="1/4">1/4 (EPON)</option>
+                <option value="1/5">1/5 (EPON)</option>
+                <option value="1/6">1/6 (EPON)</option>
+                <option value="1/7">1/7 (EPON)</option>
+                <option value="1/8">1/8 (EPON)</option>
+              </select>
+              <select id="filterStatusSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All Status</option>
+                <option value="online">Online</option>
+                <option value="weak">Weak Signal</option>
+                <option value="offline">Offline</option>
+              </select>
+              <select id="filterBrandSelect" class="ont-select-control" onchange="filterDevicesList()">
+                <option value="ALL">All Vendors</option>
+                <option value="Syrotech">Syrotech</option>
+                <option value="Realtek">Realtek</option>
+                <option value="Huawei">Huawei</option>
+                <option value="Genexis">Genexis</option>
+                <option value="TP-Link">TP-Link</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <button class="btn-ont-refresh" onclick="loadDevices()">
+                🔄 Refresh
+              </button>
+              <button class="btn-ont-filter-toggle" title="Batch Provisioning" onclick="openBatchUpgradeModal()">
+                ⚡
+              </button>
+            </div>
+          </div>
+
+          <!-- ONT MANAGEMENT DATA TABLE (MATCHING SCREENSHOT) -->
+          <div style="background: #0d1322; border: 1px solid rgba(255,255,255,0.08); border-top-left-radius: 8px; border-top-right-radius: 8px; overflow-x: auto;">
+            <table class="ont-mgmt-table">
+              <thead>
+                <tr>
+                  <th>OLT DEVICE</th>
+                  <th>PON PORT</th>
+                  <th>ONU ID / SERIAL NO.</th>
+                  <th>VENDOR / MODEL</th>
+                  <th>STATUS</th>
+                  <th>OPTICAL POWER</th>
+                  <th>UPTIME</th>
+                  <th>LAST SEEN</th>
+                  <th>TR-069 STATUS</th>
+                  <th style="text-align: center;">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="devicesTableBody">
+                <!-- Dynamically populated from TR-069 + OLT fusion -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- TABLE PAGINATION FOOTER -->
+          <div class="ont-pagination-wrap">
+            <div class="ont-pagination-info" id="ontPaginationInfo">
+              Showing 1 to 8 of 64 entries
+            </div>
+            <div class="ont-pagination-controls">
+              <select class="ont-select-control" style="padding-top:0.25rem;padding-bottom:0.25rem;font-size:0.74rem;">
+                <option>10 per page</option>
+                <option>25 per page</option>
+                <option>50 per page</option>
+              </select>
+              <button class="ont-page-btn">&lt;&lt;</button>
+              <button class="ont-page-btn">&lt;</button>
+              <button class="ont-page-btn active">1</button>
+              <button class="ont-page-btn">2</button>
+              <button class="ont-page-btn">3</button>
+              <button class="ont-page-btn">4</button>
+              <button class="ont-page-btn">5</button>
+              <button class="ont-page-btn">&gt;</button>
+              <button class="ont-page-btn">&gt;&gt;</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 2B: TR-069 ACTIVE FLEET (CWMP SUBSCRIBERS ONLY)
+             ===================================================================== -->
+        <section class="tab-view" id="view-tr069">
+          <!-- TOP BREADCRUMB & HEADER -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+            <div>
+              <div style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:0.25rem;">
+                <span style="color:#38bdf8;">Home</span> <span style="color:#475569;">&gt;</span> <span>TR-069 Active Fleet</span>
+              </div>
+              <h2 style="font-size:1.5rem;font-weight:800;color:#ffffff;margin:0;letter-spacing:-0.02em;">📡 TR-069 Managed Fleet</h2>
+              <div style="font-size:0.78rem;color:#94a3b8;margin-top:0.2rem;">Showing exclusively TR-069 configured, CWMP-bound subscriber ONTs communicating via Port 7547</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+              <button class="btn-ont-refresh" style="background:#10b981;border-color:#10b981;font-weight:700;display:inline-flex;align-items:center;gap:5px;" onclick="openCreateCustomerModal()">
+                <span>➕</span> <span>Add Subscriber</span>
+              </button>
+              <button class="btn-ont-refresh" onclick="loadDevices()">
+                <span>🔄</span> <span>Refresh TR-069 Fleet</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TR-069 KPI CARDS -->
+          <div class="ont-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.25rem;">
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-blue">📡</div>
+              <div>
+                <div class="ont-kpi-title">TR-069 Bound ONTs</div>
+                <div class="ont-kpi-value" style="color:#38bdf8;" id="kpiTr069Total">11</div>
+                <div class="ont-kpi-sub">CWMP Active Protocol</div>
+              </div>
+            </div>
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-green">🟢</div>
+              <div>
+                <div class="ont-kpi-title">Live Online Sessions</div>
+                <div class="ont-kpi-value" style="color:#10b981;" id="kpiTr069Online">11</div>
+                <div class="ont-kpi-sub">5-Min Informs Active</div>
+              </div>
+            </div>
+            <div class="ont-kpi-card">
+              <div class="ont-kpi-icon ont-icon-yellow">⚡</div>
+              <div>
+                <div class="ont-kpi-title">Avg Latency</div>
+                <div class="ont-kpi-value" style="color:#f59e0b;">28 ms</div>
+                <div class="ont-kpi-sub">Port :7547 SOAP Wire</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEARCH TOOLBAR -->
+          <div class="ont-filter-toolbar" style="margin-bottom: 1rem;">
+            <div class="ont-search-wrap" style="flex:1;">
+              <input type="text" id="searchTr069Input" class="ont-search-input" placeholder="Search TR-069 subscriber by name, PPPoE username, mobile, MAC, or IP..." onkeyup="filterTr069Table()">
+            </div>
+          </div>
+
+          <!-- TR-069 EXCLUSIVE TABLE -->
+          <div class="tailadmin-table-wrap">
+            <table class="tailadmin-table ont-mgmt-table">
+              <thead>
+                <tr>
+                  <th>SUBSCRIBER</th>
+                  <th>PPPOE / IP</th>
+                  <th>MAC ADDRESS</th>
+                  <th>VENDOR / MODEL</th>
+                  <th>STATUS</th>
+                  <th>OPTICAL RX</th>
+                  <th>WIFI (2.4G &amp; 5G)</th>
+                  <th>CONNECTED CLIENTS</th>
+                  <th style="text-align: center;">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="tr069TableBody">
+                <!-- Populated dynamically with TR-069 devices only -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 3: OPTICAL POWER TELEMETRY
+             ===================================================================== -->
+        <!-- =====================================================================
+             VIEW 3: OPTICAL POWER TELEMETRY (MATCHING SCREENSHOT)
+             ===================================================================== -->
+        <section class="tab-view" id="view-optical">
+          <!-- TOP HEADER -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+            <div>
+              <h2 style="font-size:1.45rem;font-weight:800;color:#ffffff;margin:0 0 0.25rem 0;letter-spacing:-0.02em;">Optical Power Health &amp; Attenuation Spans</h2>
+              <div style="font-size:0.78rem;color:#94a3b8;">Real-Time Laser Transceiver Rx/Tx Levels, Voltages, and Attenuation</div>
+            </div>
+            <button class="btn-ont-refresh" style="background:#2563eb;padding:0.5rem 1.25rem;font-size:0.8rem;" onclick="loadDevices()">
+              🔄 Re-scan Optical OIDs
+            </button>
+          </div>
+
+          <!-- TOP 3 OPTICAL TIER SUMMARY CARDS -->
+          <div class="optical-kpi-grid">
+            <!-- 1. Optimal Card -->
+            <div class="optical-kpi-card">
+              <div>
+                <div class="optical-card-header">
+                  <div class="optical-circle-icon optical-icon-green">📈</div>
+                  <div class="optical-card-title">Optimal <span style="font-size:0.7rem;color:#64748b;cursor:pointer;">ⓘ</span></div>
+                </div>
+                <div class="optical-card-num" id="kpiOptOptimalNum">8 ONTs</div>
+              </div>
+              <div>
+                <div class="optical-card-footer">
+                  <span>Optimal Laser (-14 to -23 dBm)</span>
+                  <span id="kpiOptOptimalPct" style="color:#10b981;font-weight:700;">80% of Fleet</span>
+                </div>
+                <div class="optical-progress-track">
+                  <div class="optical-progress-bar bar-green" id="kpiOptOptimalBar" style="width: 80%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Degraded Card -->
+            <div class="optical-kpi-card">
+              <div>
+                <div class="optical-card-header">
+                  <div class="optical-circle-icon optical-icon-amber">⚠️</div>
+                  <div class="optical-card-title">Degraded <span style="font-size:0.7rem;color:#64748b;cursor:pointer;">ⓘ</span></div>
+                </div>
+                <div class="optical-card-num" id="kpiOptDegradedNum" style="color:#f59e0b;">1 ONT</div>
+              </div>
+              <div>
+                <div class="optical-card-footer">
+                  <span>Degraded Fiber (-24 to -27 dBm)</span>
+                  <span style="color:#f59e0b;font-weight:700;">Needs Inspection</span>
+                </div>
+                <div class="optical-progress-track">
+                  <div class="optical-progress-bar bar-amber" id="kpiOptDegradedBar" style="width: 15%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Critical Card -->
+            <div class="optical-kpi-card">
+              <div>
+                <div class="optical-card-header">
+                  <div class="optical-circle-icon optical-icon-red">❗</div>
+                  <div class="optical-card-title">Critical <span style="font-size:0.7rem;color:#64748b;cursor:pointer;">ⓘ</span></div>
+                </div>
+                <div class="optical-card-num" id="kpiOptCriticalNum" style="color:#ef4444;">0 ONTs</div>
+              </div>
+              <div>
+                <div class="optical-card-footer">
+                  <span>Critical / Break (&lt; -27 dBm)</span>
+                  <span id="kpiOptCriticalCuts" style="color:#10b981;font-weight:700;">0 Active Cuts</span>
+                </div>
+                <div class="optical-progress-track">
+                  <div class="optical-progress-bar bar-red" id="kpiOptCriticalBar" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABLE FILTER & ACTION CONTROLS -->
+          <div class="ont-filter-bar" style="margin-bottom: 1.25rem;">
+            <div class="ont-filter-inputs">
+              <div class="ont-search-wrap">
+                <span class="ont-search-icon">🔍</span>
+                <input type="text" id="opticalSearchInput" class="ont-search-input" placeholder="Search in table..." onkeyup="filterOpticalTable()">
+              </div>
+              <select id="opticalHealthFilter" class="ont-select-control" onchange="filterOpticalTable()">
+                <option value="ALL">All Health Status</option>
+                <option value="NORMAL">Normal (-14 to -23 dBm)</option>
+                <option value="MARGINAL">Degraded (-24 to -27 dBm)</option>
+                <option value="CRITICAL">Critical (&lt; -27 dBm)</option>
+              </select>
+              <select id="opticalOltFilter" class="ont-select-control" onchange="filterOpticalTable()">
+                <option value="ALL">All OLTs</option>
+                <option value="SyroTech OLT-01">SyroTech OLT-01 (172.18.18.3)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <button class="btn-ont-filter-toggle" style="display:inline-flex;align-items:center;gap:4px;padding:0.45rem 0.85rem;" onclick="exportOpticalCsv()">
+                <span>📥</span> <span>Export CSV</span>
+              </button>
+              <button class="btn-ont-filter-toggle" style="display:inline-flex;align-items:center;gap:4px;padding:0.45rem 0.85rem;">
+                <span>⚙️</span> <span>Columns</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- DATA TABLE -->
+          <div style="background: #0d1322; border: 1px solid rgba(255,255,255,0.08); border-top-left-radius: 8px; border-top-right-radius: 8px; overflow-x: auto;">
+            <table class="ont-mgmt-table">
+              <thead>
+                <tr>
+                  <th>CUSTOMER NAME ⇅<br><span style="font-size:0.65rem;color:#64748b;">PON / ONT ID</span></th>
+                  <th>HARDWARE MODEL ⇅<br><span style="font-size:0.65rem;color:#64748b;">ONT SERIAL</span></th>
+                  <th>RX LASER POWER ⇅<br><span style="font-size:0.65rem;color:#64748b;">(dBm)</span></th>
+                  <th>TX LASER POWER ⇅<br><span style="font-size:0.65rem;color:#64748b;">(dBm)</span></th>
+                  <th>LASER TEMP ⇅<br><span style="font-size:0.65rem;color:#64748b;">(°C)</span></th>
+                  <th>VOLTAGE ⇅<br><span style="font-size:0.65rem;color:#64748b;">(V)</span></th>
+                  <th>BIAS CURRENT ⇅<br><span style="font-size:0.65rem;color:#64748b;">(mA)</span></th>
+                  <th>ESTIMATED DISTANCE ⇅<br><span style="font-size:0.65rem;color:#64748b;">(m)</span></th>
+                  <th>HEALTH STATUS ⇅</th>
+                  <th style="text-align: center;">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="opticalTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- TABLE PAGINATION FOOTER -->
+          <div class="ont-pagination-wrap">
+            <div class="ont-pagination-info" id="opticalPaginationInfo">
+              Showing 1 to 6 of 9 entries
+            </div>
+            <div class="ont-pagination-controls">
+              <button class="ont-page-btn">&laquo;</button>
+              <button class="ont-page-btn">&lt;</button>
+              <button class="ont-page-btn active">1</button>
+              <button class="ont-page-btn">2</button>
+              <button class="ont-page-btn">&gt;</button>
+              <button class="ont-page-btn">&raquo;</button>
+              <span style="font-size:0.74rem;color:#64748b;margin-left:0.5rem;">Rows per page:</span>
+              <select class="ont-select-control" style="padding-top:0.2rem;padding-bottom:0.2rem;font-size:0.74rem;">
+                <option>10</option>
+                <option>25</option>
+                <option>50</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- BOTTOM 3 ANALYTICAL REFERENCE & INSIGHTS BOXES (MATCHING SCREENSHOT) -->
+          <div class="optical-bottom-grid">
+            <!-- Box 1: Optical Power Reference -->
+            <div class="optical-bottom-box">
+              <div class="optical-box-heading">Optical Power Reference</div>
+              <div class="optical-ref-item">
+                <span class="optical-ref-dot" style="background:#10b981;"></span>
+                <span><strong>Optimal:</strong> -14 to -23 dBm</span>
+              </div>
+              <div class="optical-ref-item">
+                <span class="optical-ref-dot" style="background:#f59e0b;"></span>
+                <span><strong>Degraded:</strong> -24 to -27 dBm</span>
+              </div>
+              <div class="optical-ref-item">
+                <span class="optical-ref-dot" style="background:#ef4444;"></span>
+                <span><strong>Critical / Break:</strong> &lt; -27 dBm</span>
+              </div>
+              <div class="optical-ref-sub">
+                <div>ⓘ Minimum Acceptable: -18 dBm</div>
+                <div>ⓘ Typical Operating: -14 to -23 dBm</div>
+                <div>ⓘ Best Performance: -14 to -19 dBm</div>
+              </div>
+            </div>
+
+            <!-- Box 2: Quick Insights -->
+            <div class="optical-bottom-box">
+              <div class="optical-box-heading">Quick Insights</div>
+              <div class="optical-insights-grid">
+                <div class="optical-pod">
+                  <div class="optical-pod-icon pod-green">📈</div>
+                  <div>
+                    <div class="optical-pod-label">Avg Rx Power</div>
+                    <div class="optical-pod-val" id="insAvgRx">-16.83 dBm</div>
+                  </div>
+                </div>
+                <div class="optical-pod">
+                  <div class="optical-pod-icon pod-blue">⚡</div>
+                  <div>
+                    <div class="optical-pod-label">Avg Tx Power</div>
+                    <div class="optical-pod-val" id="insAvgTx">+2.99 dBm</div>
+                  </div>
+                </div>
+                <div class="optical-pod">
+                  <div class="optical-pod-icon pod-orange">🌡️</div>
+                  <div>
+                    <div class="optical-pod-label">Avg Temp</div>
+                    <div class="optical-pod-val" id="insAvgTemp">48.4 °C</div>
+                  </div>
+                </div>
+                <div class="optical-pod">
+                  <div class="optical-pod-icon pod-purple">📏</div>
+                  <div>
+                    <div class="optical-pod-label">Total Distance</div>
+                    <div class="optical-pod-val" id="insTotalDist">15,480 m</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Box 3: Last Scan -->
+            <div class="optical-bottom-box">
+              <div class="optical-box-heading">Last Scan</div>
+              <div class="optical-last-scan-box">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <span style="font-size:1.3rem;">📅</span>
+                  <div>
+                    <div style="font-weight:700;color:#ffffff;font-size:0.84rem;" id="insLastScanTime">18 Aug 2026, 09:58 AM</div>
+                    <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">Auto scan every 5 minutes</div>
+                  </div>
+                </div>
+                <span style="font-size:1.2rem;color:#64748b;cursor:pointer;" title="Scan History" onclick="loadDevices()">⏱️</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW: FIELD TECHNICIANS (Operator Staff Management)
+             ===================================================================== -->
+        <section class="tab-view" id="view-technicians">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">👨‍🔧 Field Technicians & Engineering Staff</h2>
+              <div class="page-subtitle">Manage Field Service Staff, Login Credentials, and Service Zones</div>
+            </div>
+            <button class="btn-primary" onclick="openAddTechnicianModal()">
+              ➕ Add New Field Technician
+            </button>
+          </div>
+
+          <div class="tailadmin-box" style="padding: 0; overflow: hidden;">
+            <div class="tailadmin-table-wrap">
+              <table class="tailadmin-table">
+                <thead>
+                  <tr>
+                    <th>Technician Name</th>
+                    <th>Mobile Phone</th>
+                    <th>App Username (Login)</th>
+                    <th>Secret Password</th>
+                    <th>Assigned Area / Mandal</th>
+                    <th>Account Status</th>
+                    <th style="text-align: center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="techniciansTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW: WHATSAPP LIVE CONVERSATIONS & CHATS
+             ===================================================================== -->
+        <section class="tab-view" id="view-whatsapp-chats">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">💬 WhatsApp Live Customer Conversations & Support Bot</h2>
+              <div class="page-subtitle">Real-Time Inbound Customer Chats, Auto-AI Support Bot & Manual NOC Dispatch</div>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:center;">
+              <span class="tailadmin-badge success" id="waChatSessionBadge">
+                <span class="pulse-dot"></span> 📱 WHATSAPP WEB ACTIVE
+              </span>
+              <button class="btn-outline" onclick="loadWhatsAppThreads()">
+                🔄 Refresh Chats
+              </button>
+            </div>
+          </div>
+
+          <!-- SPLIT CHAT MESSENGER CONTAINER -->
+          <div class="tailadmin-box" style="padding:0;overflow:hidden;height:650px;display:flex;border:1px solid rgba(255,255,255,0.08);background:#0B132B;border-radius:10px;">
+            <!-- LEFT THREADS SIDEBAR -->
+            <div style="width:340px;border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;background:rgba(15,23,42,0.6);">
+              <div style="padding:1rem;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <input type="text" id="searchWaThreads" class="form-control" placeholder="🔍 Search by phone or name..." oninput="filterWhatsAppThreads(this.value)" style="font-size:0.85rem;">
+              </div>
+              <div id="waThreadsList" style="flex:1;overflow-y:auto;">
+                <!-- Dynamically populated threads -->
+              </div>
+            </div>
+
+            <!-- RIGHT ACTIVE CHAT CONVERSATION AREA -->
+            <div style="flex:1;display:flex;flex-direction:column;background:#060C1D;">
+              <!-- CHAT HEADER WITH SUBSCRIBER TELEMETRY -->
+              <div id="waActiveChatHeader" style="padding:0.9rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.85);">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                  <div id="waActiveAvatar" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg, #10b981, #047857);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:#ffffff;">
+                    💬
+                  </div>
+                  <div>
+                    <div id="waActiveName" style="font-weight:700;color:#ffffff;font-size:0.95rem;">Select a Conversation</div>
+                    <div id="waActivePhone" class="mono" style="font-size:0.75rem;color:#94a3b8;">Click any customer from the left list</div>
+                  </div>
+                </div>
+                <div id="waActiveTelemetry" style="display:flex;gap:0.5rem;align-items:center;">
+                  <!-- Dynamic badges: ONT model, RX dBm, Online Status -->
+                </div>
+              </div>
+
+              <!-- CHAT MESSAGES SCROLL AREA -->
+              <div id="waMessagesContainer" style="flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+                <div style="text-align:center;color:#64748b;margin:auto;font-size:0.9rem;">
+                  👈 Select a customer conversation from the list to view live chat history
+                </div>
+              </div>
+
+              <!-- QUICK ACTION CHIPS -->
+              <div style="padding:0.4rem 1rem;background:rgba(15,23,42,0.6);border-top:1px solid rgba(255,255,255,0.05);display:flex;gap:0.4rem;overflow-x:auto;">
+                <button type="button" class="btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;" onclick="insertQuickReply('1')">📊 Send Live Status</button>
+                <button type="button" class="btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;" onclick="insertQuickReply('2')">📶 Send WiFi Details</button>
+                <button type="button" class="btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;" onclick="insertQuickReply('4')">🔄 Send Reboot Command</button>
+                <button type="button" class="btn-outline" style="font-size:0.72rem;padding:0.2rem 0.5rem;" onclick="insertQuickReply('నమస్తే! మీ సమస్యను మా ఇంజనీర్ పరిశీలిస్తున్నారు.')">👨‍🔧 Engineer Assign Note</button>
+              </div>
+
+              <!-- MESSAGE COMPOSER -->
+              <form id="waReplyForm" onsubmit="sendWhatsAppReply(event)" style="padding:0.75rem 1rem;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:0.75rem;background:rgba(15,23,42,0.9);">
+                <input type="text" id="waReplyTextInput" class="form-control" placeholder="Type a message or response to customer..." style="flex:1;" autocomplete="off" required>
+                <button type="submit" class="btn-primary" style="padding:0.6rem 1.25rem;display:flex;align-items:center;gap:0.4rem;">
+                  <span>Send</span> 🚀
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 4: GIS OUTSIDE PLANT MAP (Leaflet Integration)
+             ===================================================================== -->
+        <section class="tab-view" id="view-map">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">GIS Outside Plant & Fiber Distribution (FDP)</h2>
+              <div class="page-subtitle">Telangana / Hyderabad Core Outside Plant Network Topology</div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn-primary" onclick="openCreateFdpModal()">
+                📦 Add New FDP Splitter
+              </button>
+              <button class="btn-outline" onclick="centerGisMapOnCore()">
+                🎯 Center Network Core
+              </button>
+            </div>
+          </div>
+
+          <div class="tailadmin-box" style="padding: 0; overflow: hidden;">
+            <div id="gisMap" style="height: 650px; width: 100%; background: #1A222C;"></div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 5: LIVE CWMP PROTOCOL STREAM
+             ===================================================================== -->
+        <section class="tab-view" id="view-logs">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">Live CWMP Protocol Informs & Audits</h2>
+              <div class="page-subtitle">Real-Time TR-069 SOAP Events, GetParameterValues, and RPC Sessions</div>
+            </div>
+            <div style="display:flex;gap:0.75rem;">
+              <button class="btn-primary" onclick="loadLogs()">
+                🔄 Refresh Logs
+              </button>
+              <button class="btn-outline" onclick="clearLogsTable()">
+                🗑️ Clear View
+              </button>
+            </div>
+          </div>
+
+          <div class="tailadmin-box" style="padding: 0; overflow: hidden;">
+            <div class="tailadmin-table-wrap">
+              <table class="tailadmin-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Device SN</th>
+                    <th>Event Code</th>
+                    <th>HTTP Method / RPC</th>
+                    <th>IP Address</th>
+                    <th>Payload Preview</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 6: OLT HEADEND MANAGEMENT & HARDWARE ROUTER FUSION
+             ===================================================================== -->
+        <section class="tab-view" id="view-olt">
+          <div class="page-header-row">
+            <div>
+              <h2 class="page-title">🏢 OLT Headend Management & Hardware Router Uplink</h2>
+              <div class="page-subtitle">Syrotech EPON / GPON OLT Telemetry, SFP Laser Diagnostics, Fiber Distance & TR-069 CPE Fusion</div>
+            </div>
+            <div style="display:flex;gap:0.75rem;">
+              <button class="btn-primary" onclick="window.openAddOltModal()">
+                ➕ Integrate New OLT
+              </button>
+              <button class="btn-outline" id="btnRefreshOlt" onclick="window.refreshOltTelemetry()">
+                ⚡ Refresh OLT Telemetry
+              </button>
+            </div>
+          </div>
+
+          <!-- TOP SUMMARY METRIC CARDS -->
+          <div class="tailadmin-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.5rem;">
+            <div class="tailadmin-box" style="padding:1.15rem;margin:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">OLT HARDWARE STATUS</span>
+                <span class="tailadmin-badge" id="oltHeadendStatusBadge" style="font-size:0.7rem;background:rgba(255,255,255,0.05);color:#94a3b8;">⚪ STANDBY</span>
+              </div>
+              <div class="mono" style="font-size:1.1rem;font-weight:800;color:#ffffff;" id="oltHeadendName">No Headend OLT Connected</div>
+              <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.25rem;" id="oltHeadendMeta">No physical OLT integrated yet. Click "➕ Integrate New OLT" to link your hardware.</div>
+            </div>
+
+            <div class="tailadmin-box" style="padding:1.15rem;margin:0;">
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;">SYSTEM HEALTH & THERMAL</div>
+              <div class="mono" style="font-size:1.1rem;font-weight:800;color:#38bdf8;" id="oltCpuMemDisplay">CPU: -- • RAM: --</div>
+              <div style="font-size:0.72rem;color:#10b981;margin-top:0.25rem;" id="oltTempUptimeDisplay">Core Temp: -- • Uptime: --</div>
+            </div>
+
+            <div class="tailadmin-box" style="padding:1.15rem;margin:0;">
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;">ACTIVE PON FLEET INVENTORY</div>
+              <div class="mono" style="font-size:1.1rem;font-weight:800;color:#a855f7;" id="oltTotalOnusDisplay">0 ONUs Registered</div>
+              <div style="font-size:0.72rem;color:#cbd5e1;margin-top:0.25rem;" id="oltPonBreakdownDisplay">0 PON Ports Active</div>
+            </div>
+
+            <div class="tailadmin-box" style="padding:1.15rem;margin:0;">
+              <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;">TR-069 + OLT CROSS-HEALTH</div>
+              <div class="mono" style="font-size:1.1rem;font-weight:800;color:#94a3b8;" id="oltCrossHealthDisplay">⚪ No OLT Linked</div>
+              <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.25rem;" id="oltIssuesCountDisplay">Click "+ Add OLT" to configure headend hardware</div>
+            </div>
+          </div>
+
+          <!-- ANIMATED OLT UPLINK & TRAFFIC BANDWIDTH TELEMETRY PIPELINE -->
+          <div class="tailadmin-box" style="padding:1.25rem;margin-bottom:1.5rem;background:linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(30,41,59,0.75) 100%);border:1px solid rgba(56,189,248,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="position:relative;width:14px;height:14px;">
+                  <span class="live-laser-pulse"></span>
+                </div>
+                <div>
+                  <strong style="font-size:0.95rem;color:#ffffff;">⚡ Live Optical Uplink & Carrier Bandwidth Pipeline</strong>
+                  <div style="font-size:0.75rem;color:#94a3b8;">Real-time Inbound / Outbound Traffic Flow & Physical Interface Status</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:0.75rem;align-items:center;">
+                <span class="tailadmin-badge neutral" style="font-size:0.72rem;" id="oltUplinkStatusHeaderBadge">⚪ STANDBY (NO OLT LINKED)</span>
+              </div>
+            </div>
+
+            <!-- Bandwidth Flow Meters (IN / OUT) -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1.25rem;margin-bottom:1.25rem;">
+              <!-- Inbound Meter -->
+              <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.9rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.4rem;">
+                  <span style="color:#38bdf8;font-weight:700;">⬇️ INBOUND CARRIER TRAFFIC (DOWNLOAD)</span>
+                  <span class="mono" style="color:#38bdf8;font-weight:800;" id="oltTrafficInVal">0.0 Mbps</span>
+                </div>
+                <div style="height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;position:relative;">
+                  <div id="oltTrafficInBar" style="width:0%;height:100%;background:linear-gradient(90deg, #0284c7, #38bdf8);border-radius:5px;transition:width 0.6s ease;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:#94a3b8;margin-top:0.35rem;">
+                  <span>Peak: 0 Mbps</span>
+                  <span>Bandwidth Utilization: 0%</span>
+                </div>
+              </div>
+
+              <!-- Outbound Meter -->
+              <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.9rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.4rem;">
+                  <span style="color:#10b981;font-weight:700;">⬆️ OUTBOUND CARRIER TRAFFIC (UPLOAD)</span>
+                  <span class="mono" style="color:#10b981;font-weight:800;" id="oltTrafficOutVal">0.0 Mbps</span>
+                </div>
+                <div style="height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;position:relative;">
+                  <div id="oltTrafficOutBar" style="width:0%;height:100%;background:linear-gradient(90deg, #059669, #10b981);border-radius:5px;transition:width 0.6s ease;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:#94a3b8;margin-top:0.35rem;">
+                  <span>Peak: 0 Mbps</span>
+                  <span>Bandwidth Utilization: 0%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Animated Physical Port Status LEDs -->
+            <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:center;background:rgba(255,255,255,0.02);padding:0.75rem 1rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+              <span style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">PHYSICAL PORT STATUS:</span>
+              <div style="display:flex;gap:1.25rem;flex-wrap:wrap;" id="oltPhysicalPortLeds">
+                <div style="color:#64748b;font-size:0.75rem;padding:0.25rem 0;">No active physical OLT headends configured. Click "➕ Integrate New OLT" to connect.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARRIER UPLINK INTERFACES & SUBSCRIBER DENSITY MATRIX -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));gap:1.25rem;margin-bottom:1.5rem;">
+            <!-- Left: Live Uplink Ports Status -->
+            <div class="tailadmin-box" style="padding:1.25rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <span style="font-size:1.1rem;">🌐</span>
+                  <div>
+                    <strong style="font-size:0.9rem;color:#ffffff;">Physical Carrier Uplink Interfaces</strong>
+                    <div style="font-size:0.72rem;color:var(--text-body);">Core Headend Upstream Gateways & Optical Trunk Links</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge success" style="font-size:0.7rem;" id="oltPrimaryUplinkBadge">🟢 GE 0/1 ACTIVE</span>
+              </div>
+              <div id="oltUplinkPortsList" style="display:flex;flex-direction:column;gap:0.6rem;">
+                <!-- Dynamically populated uplink interfaces -->
+              </div>
+            </div>
+
+            <!-- Right: Subscriber Density Per PON Port -->
+            <div class="tailadmin-box" style="padding:1.25rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                  <span style="font-size:1.1rem;">📊</span>
+                  <div>
+                    <strong style="font-size:0.9rem;color:#ffffff;">Subscriber Density by PON Port</strong>
+                    <div style="font-size:0.72rem;color:var(--text-body);">Customer Distribution & Splitter Load Balancing</div>
+                  </div>
+                </div>
+                <span class="tailadmin-badge warning" style="font-size:0.7rem;" id="oltTopLoadedPonBadge">🔥 EPON 0/1 Top Loaded</span>
+              </div>
+              <div id="oltPonDensityList" style="display:flex;flex-direction:column;gap:0.65rem;">
+                <!-- Dynamically populated PON distribution -->
+              </div>
+            </div>
+          </div>
+
+          <!-- CROSS-LAYER DIAGNOSTICS & ISSUE BANNER -->
+          <div id="oltAlertBannerContainer" style="margin-bottom:1.5rem;"></div>
+
+          <!-- CONNECTED ONUS & HARDWARE ROUTERS TABLE -->
+          <div class="tailadmin-box" style="padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+              <div>
+                <strong style="font-size:0.95rem;color:#ffffff;">📡 Connected ONUs & Hardware Subscriber Routers</strong>
+                <div style="font-size:0.75rem;color:var(--text-body);">Auto-matched with TR-069 CPE Database by MAC address with Fiber Distance & Attenuation</div>
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <input type="text" id="searchOltOnu" class="form-control" placeholder="Search subscriber, MAC, PON port..." style="width:240px;padding:0.4rem 0.75rem;font-size:0.8rem;" onkeyup="window.filterOltOnusList()">
+                <select id="filterOltPon" class="form-control" style="width:auto;padding:0.4rem 0.75rem;font-size:0.8rem;" onchange="window.onSelectOltPonDropdown(this.value)">
+                  <option value="ALL">All PON Ports</option>
+                  <option value="EPON 0/1">EPON 0/1</option>
+                  <option value="EPON 0/2">EPON 0/2</option>
+                  <option value="EPON 0/3">EPON 0/3</option>
+                  <option value="EPON 0/4">EPON 0/4</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- INTERACTIVE PON-WISE TABS -->
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;" id="oltPonTabsContainer">
+              <button class="modal-tab-btn active" id="ponTabAll" onclick="window.selectOltPonTab('ALL')" style="font-size:0.78rem;padding:0.35rem 0.75rem;">🌐 All ONUs (<span id="countPonAll">71</span>)</button>
+              <button class="modal-tab-btn" id="ponTab1" onclick="window.selectOltPonTab('EPON 0/1')" style="font-size:0.78rem;padding:0.35rem 0.75rem;">⚡ EPON 0/1 (<span id="countPon1">14</span>)</button>
+              <button class="modal-tab-btn" id="ponTab2" onclick="window.selectOltPonTab('EPON 0/2')" style="font-size:0.78rem;padding:0.35rem 0.75rem;">🔥 EPON 0/2 (<span id="countPon2">29</span>)</button>
+              <button class="modal-tab-btn" id="ponTab3" onclick="window.selectOltPonTab('EPON 0/3')" style="font-size:0.78rem;padding:0.35rem 0.75rem;">⚡ EPON 0/3 (<span id="countPon3">14</span>)</button>
+              <button class="modal-tab-btn" id="ponTab4" onclick="window.selectOltPonTab('EPON 0/4')" style="font-size:0.78rem;padding:0.35rem 0.75rem;">⚡ EPON 0/4 (<span id="countPon4">14</span>)</button>
+            </div>
+
+            <div class="tailadmin-table-wrap">
+              <table class="tailadmin-table" style="font-size:0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Subscriber / Account</th>
+                    <th>PON Port</th>
+                    <th>ONU MAC Address</th>
+                    <th>Hardware Model</th>
+                    <th>Laser Tx / Rx Power</th>
+                    <th>Fiber Distance</th>
+                    <th>OLT Status</th>
+                    <th>TR-069 Cross-Sync</th>
+                    <th style="text-align:center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tblOltOnusManagementBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- PON PORTS OPTICAL SFP MATRIX & REGISTERED OLT FLEET (2 COLUMN) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(420px, 1fr));gap:1.5rem;">
+            <!-- Left: PON Port Optical Matrix -->
+            <div class="tailadmin-box" style="padding:1.25rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                <strong style="font-size:0.9rem;color:#ffffff;">⚡ PON Optical SFP Port Matrix</strong>
+                <span class="tailadmin-badge primary" style="font-size:0.7rem;">Live Transceivers</span>
+              </div>
+              <div class="tailadmin-table-wrap">
+                <table class="tailadmin-table" style="font-size:0.78rem;">
+                  <thead>
+                    <tr>
+                      <th>Port</th>
+                      <th>SFP Tx Power</th>
+                      <th>Temp</th>
+                      <th>Voltage</th>
+                      <th>Active ONUs</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblOltPonMatrixBody">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right: Registered OLT Fleet & Gateways -->
+            <div class="tailadmin-box" style="padding:1.25rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                <strong style="font-size:0.9rem;color:#ffffff;">🏢 Registered OLT Headends</strong>
+                <button class="btn-primary" style="padding:0.25rem 0.6rem;font-size:0.72rem;" onclick="openAddOltModal()">➕ Add OLT</button>
+              </div>
+              <div class="tailadmin-table-wrap">
+                <table class="tailadmin-table" style="font-size:0.78rem;">
+                  <thead>
+                    <tr>
+                      <th>OLT Name</th>
+                      <th>Host IP / Port</th>
+                      <th>Brand</th>
+                      <th>Status</th>
+                      <th style="text-align:center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblOltFleetManagerBody">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       3. 6-TAB EDIT CPE MODAL (WAN, LAN, WiFi, VoIP, Optical, GIS)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="deviceModal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div style="font-size: 0.75rem; color: var(--primary); font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;" id="mBreadcrumbTenant">
+            VRV ACS / TS / TELANGANA / RUDRA FIBERNET
+          </div>
+          <h3 class="modal-title" id="mDeviceTitle">Edit CPE - Loading...</h3>
+          <div style="font-size: 0.8rem; color: var(--text-body);" id="mDeviceSubtitle">Hardware & Profile Config</div>
+        </div>
+        <button class="btn-icon-action" onclick="closeDeviceModal()">✕</button>
+      </div>
+
+      <!-- 7-TAB NAVIGATION BAR -->
+      <div class="modal-tabs-bar">
+        <button class="modal-tab-btn active" data-mtab="mtab-wan">🌐 WAN</button>
+        <button class="modal-tab-btn" data-mtab="mtab-wifi">📶 WiFi (Multi-SSID)</button>
+        <button class="modal-tab-btn" data-mtab="mtab-hosts">📱 Connected Devices</button>
+        <button class="modal-tab-btn" data-mtab="mtab-speedtest">🚀 Speed Test</button>
+        <button class="modal-tab-btn" data-mtab="mtab-voip">📞 VoIP</button>
+        <button class="modal-tab-btn" data-mtab="mtab-optical">⚡ Optical Telemetry</button>
+        <button class="modal-tab-btn" data-mtab="mtab-customer">👤 Customer & GIS</button>
+        <button class="modal-tab-btn" data-mtab="mtab-actions">⚙️ Diagnostics & Actions</button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- TAB 1: WAN CONFIGURATION -->
+        <div class="mtab-content active" id="mtab-wan">
+          <!-- Active Connection Interfaces Table -->
+          <div style="margin-bottom:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+              <strong style="color:#ffffff;font-size:0.88rem;">🌐 Active WAN Connection Interfaces &amp; Assigned IPs</strong>
+              <span id="wanConnCountBadge" class="tailadmin-badge primary">0 Interfaces</span>
+            </div>
+            <div class="tailadmin-table-wrap">
+              <table class="tailadmin-table" style="font-size:0.75rem;">
+                <thead>
+                  <tr>
+                    <th>Interface</th>
+                    <th>Service</th>
+                    <th>Type</th>
+                    <th>VLAN</th>
+                    <th>Assigned WAN IP</th>
+                    <th>Gateway</th>
+                    <th>Status</th>
+                    <th style="text-align:center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tblWanConnectionsBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:1rem;margin-bottom:1rem;">
+            <strong style="color:#38bdf8;font-size:0.85rem;">✏️ Edit Primary WAN / PPPoE Credentials</strong>
+          </div>
+
+          <form id="formModalWan">
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">Connection Type:</label>
+                <select id="wanConnType" class="form-control">
+                  <option value="PPPoE">PPPoE (Point-to-Point Protocol)</option>
+                  <option value="DHCP">DHCP (Dynamic IP / IPoE)</option>
+                  <option value="Static">Static IP</option>
+                  <option value="Bridge">Bridge Mode</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Connection Mode:</label>
+                <select id="wanConnMode" class="form-control">
+                  <option value="IP_Routed">IP_Routed (Route Mode)</option>
+                  <option value="IP_Bridged">IP_Bridged</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">IP Protocol Version:</label>
+                <select id="wanIpVersion" class="form-control">
+                  <option value="IPv4/IPv6">IPv4/IPv6 (Dual Stack)</option>
+                  <option value="IPv4">IPv4 Only</option>
+                  <option value="IPv6">IPv6 Only</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">Service Type:</label>
+                <select id="wanServiceType" class="form-control">
+                  <option value="INTERNET_TR069">INTERNET_TR069</option>
+                  <option value="INTERNET">INTERNET</option>
+                  <option value="VOIP">VOIP</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">VLAN ID (Tagging):</label>
+                <input type="number" id="wanVlanId" class="form-control mono" placeholder="203" min="1" max="4094">
+              </div>
+              <div class="form-group">
+                <label class="form-label">MTU Size:</label>
+                <input type="number" id="wanMtu" class="form-control mono" value="1492" min="576" max="1500">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">PPPoE Username:</label>
+                <input type="text" id="wanUsername" class="form-control mono" placeholder="e.g. user_ftth_101" style="font-weight:700;color:#38bdf8;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">PPPoE Secret Password:</label>
+                <div style="display:flex;gap:0.4rem;">
+                  <input type="text" id="wanPassword" class="form-control mono" placeholder="PPPoE Password" style="font-weight:700;color:#10b981;">
+                  <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('wanPassword')" title="Toggle visibility">👁️</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-meta-4); border-radius: var(--radius-sm);">
+              <label class="form-label" style="margin-bottom: 0.75rem;">Port Binding Selection:</label>
+              <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" checked style="accent-color:var(--primary);"> LAN1</label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" checked style="accent-color:var(--primary);"> LAN2</label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" checked style="accent-color:var(--primary);"> AP1 (2.4G)</label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" checked style="accent-color:var(--primary);"> AP2 (5G)</label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" style="accent-color:var(--primary);"> AP3</label>
+                <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" style="accent-color:var(--primary);"> AP4</label>
+              </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 1.5rem;">
+              <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem;">
+                💾 Update WAN Configuration
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 2: WIFI CONFIGURATION (MULTI-SSID & FREQUENCY) -->
+        <div class="mtab-content" id="mtab-wifi">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <strong style="color:#ffffff;font-size:0.9rem;">📶 Broadcast Wireless SSIDs (2.4GHz &amp; 5GHz Dual-Band)</strong>
+            <button type="button" class="btn-outline" style="font-size:0.75rem;padding:0.3rem 0.75rem;" onclick="generateWifiQrCode()">
+              📱 WiFi QR Connect
+            </button>
+          </div>
+
+          <div class="tailadmin-table-wrap" style="margin-bottom: 1.5rem;">
+            <table class="tailadmin-table" style="font-size:0.78rem;">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Frequency Band</th>
+                  <th>SSID Name</th>
+                  <th>Status</th>
+                  <th>Standard</th>
+                  <th>Tx Power</th>
+                  <th>Security Mode</th>
+                  <th>Hide SSID</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td><span style="color:#38bdf8;font-weight:700;">2.4 GHz (Primary)</span></td>
+                  <td><strong id="wlanRow1Ssid" style="color:#ffffff;">Rudra_Fiber_2.4G</strong></td>
+                  <td><span class="tailadmin-badge success">Active (Up)</span></td>
+                  <td>802.11 b/g/n</td>
+                  <td>100% (20dBm)</td>
+                  <td>WPA2-PSK (AES)</td>
+                  <td><span class="tailadmin-badge primary">Broadcast</span></td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td><span style="color:#a855f7;font-weight:700;">5 GHz (High Speed)</span></td>
+                  <td><strong id="wlanRow2Ssid" style="color:#ffffff;">Rudra_Fiber_5G</strong></td>
+                  <td><span class="tailadmin-badge success">Active (Up)</span></td>
+                  <td>802.11 a/n/ac/ax</td>
+                  <td>100% (23dBm)</td>
+                  <td>WPA2/WPA3-Personal</td>
+                  <td><span class="tailadmin-badge primary">Broadcast</span></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td><span style="color:#64748b;font-weight:600;">2.4 GHz (Guest)</span></td>
+                  <td><span style="color:#94a3b8;" id="wlanRow3Ssid">Rudra_Guest_2.4G</span></td>
+                  <td><span class="tailadmin-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;">Disabled</span></td>
+                  <td>802.11 b/g/n</td>
+                  <td>50%</td>
+                  <td>WPA2-PSK</td>
+                  <td><span>Hidden</span></td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td><span style="color:#64748b;font-weight:600;">5 GHz (Guest)</span></td>
+                  <td><span style="color:#94a3b8;" id="wlanRow4Ssid">Rudra_Guest_5G</span></td>
+                  <td><span class="tailadmin-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;">Disabled</span></td>
+                  <td>802.11 a/n/ac</td>
+                  <td>50%</td>
+                  <td>WPA2-PSK</td>
+                  <td><span>Hidden</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <form id="formModalWifi">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">2.4GHz Primary WiFi SSID Name:</label>
+                <input type="text" id="wlan24Ssid" class="form-control mono" placeholder="VRV_Fiber_2.4G">
+              </div>
+              <div class="form-group">
+                <label class="form-label">2.4GHz WPA2 Passphrase / Secret:</label>
+                <div style="display:flex;gap:0.4rem;">
+                  <input type="text" id="wlan24Password" class="form-control mono" placeholder="e.g. 12345678" style="font-weight:700;color:#10b981;">
+                  <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('wlan24Password')" title="Toggle visibility">👁️</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="wlan5gNotSupportedNotice" style="display:none;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);padding:0.75rem 1rem;border-radius:6px;margin:0.75rem 0;color:#94a3b8;font-size:0.8rem;">
+              ℹ️ <strong>Single-Band (2.4GHz) ONT:</strong> 5GHz High-Speed Radio is not supported on this hardware model.
+            </div>
+
+            <div id="wlan5gConfigSection" class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">5GHz High-Speed WiFi SSID Name:</label>
+                <input type="text" id="wlan5Ssid" class="form-control mono" placeholder="VRV_Fiber_5G">
+              </div>
+              <div class="form-group">
+                <label class="form-label">5GHz WPA2/WPA3 Passphrase / Secret:</label>
+                <div style="display:flex;gap:0.4rem;">
+                  <input type="text" id="wlan5Password" class="form-control mono" placeholder="e.g. 12345678" style="font-weight:700;color:#38bdf8;">
+                  <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('wlan5Password')" title="Toggle visibility">👁️</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid-3" style="margin-top:0.75rem;">
+              <div class="form-group">
+                <label class="form-label">2.4GHz Channel:</label>
+                <select id="wlan24Channel" class="form-control">
+                  <option value="Auto">Auto (Smart Interference Avoidance)</option>
+                  <option value="1">Channel 1 (2.412 GHz)</option>
+                  <option value="6" selected>Channel 6 (2.437 GHz)</option>
+                  <option value="11">Channel 11 (2.462 GHz)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">5GHz Channel / Bandwidth:</label>
+                <select id="wlan5Channel" class="form-control">
+                  <option value="36">Channel 36 (80 MHz Wideband)</option>
+                  <option value="40">Channel 40</option>
+                  <option value="44">Channel 44</option>
+                  <option value="149">Channel 149 (High Power)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Transmit Laser/RF Power:</label>
+                <select id="wlanTxPower" class="form-control">
+                  <option value="100">100% (Maximum Coverage)</option>
+                  <option value="75">75%</option>
+                  <option value="50">50% (Eco Power)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 1.25rem;">
+              <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem;">
+                💾 Update WiFi Parameters via TR-069
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 3: CONNECTED CLIENTS & HOST MANAGEMENT -->
+        <div class="mtab-content" id="mtab-hosts">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div>
+              <strong style="color:#ffffff;font-size:0.95rem;">📱 Connected Host Devices (LAN / WiFi Clients)</strong>
+              <div style="font-size:0.75rem;color:#94a3b8;">Real-time active DHCP client leases, IP, MAC addresses &amp; wireless RSSI signal</div>
+            </div>
+            <button class="btn-outline" style="font-size:0.75rem;padding:0.35rem 0.85rem;" onclick="loadConnectedHosts()">
+              🔄 Refresh Active Hosts
+            </button>
+          </div>
+
+          <div class="tailadmin-table-wrap">
+            <table class="tailadmin-table" style="font-size:0.78rem;">
+              <thead>
+                <tr>
+                  <th>Host / Device Name</th>
+                  <th>Assigned IP</th>
+                  <th>MAC Address</th>
+                  <th>Connection Medium</th>
+                  <th>Signal Strength / Rate</th>
+                  <th>Lease Duration</th>
+                  <th style="text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="tblConnectedHostsBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 4: LIVE SPEED TEST & TR-143 DIAGNOSTICS -->
+        <div class="mtab-content" id="mtab-speedtest">
+          <div style="background:#0d1322;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;text-align:center;">
+            <h3 style="font-size:1.15rem;font-weight:800;color:#ffffff;margin-bottom:0.25rem;">🚀 Real-Time Speed &amp; Bandwidth Diagnostics (TR-143)</h3>
+            <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:1.5rem;">Direct end-to-end bandwidth test between subscriber ONT router and core ISP network</div>
+
+            <!-- Speedometer Display Grid -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1rem;margin-bottom:1.75rem;">
+              <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Download Speed</div>
+                <div style="font-size:1.8rem;font-weight:800;color:#10b981;margin:0.25rem 0;" id="speedDownloadVal">-- Mbps</div>
+                <div style="font-size:0.7rem;color:#64748b;">Carrier Bandwidth</div>
+              </div>
+
+              <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Upload Speed</div>
+                <div style="font-size:1.8rem;font-weight:800;color:#38bdf8;margin:0.25rem 0;" id="speedUploadVal">-- Mbps</div>
+                <div style="font-size:0.7rem;color:#64748b;">Upstream Fiber Rate</div>
+              </div>
+
+              <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Ping Latency</div>
+                <div style="font-size:1.8rem;font-weight:800;color:#f59e0b;margin:0.25rem 0;" id="speedPingVal">-- ms</div>
+                <div style="font-size:0.7rem;color:#64748b;">Core RTT</div>
+              </div>
+
+              <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:8px;padding:1rem;">
+                <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Jitter / Packet Loss</div>
+                <div style="font-size:1.8rem;font-weight:800;color:#a855f7;margin:0.25rem 0;" id="speedJitterVal">0.0%</div>
+                <div style="font-size:0.7rem;color:#64748b;">0.8ms Jitter</div>
+              </div>
+            </div>
+
+            <!-- Animated Progress Bar -->
+            <div id="speedProgressWrap" style="display:none;margin-bottom:1.5rem;">
+              <div style="font-size:0.78rem;color:#38bdf8;margin-bottom:0.5rem;" id="speedProgressText">⚡ Testing ONT Downlink Throughput...</div>
+              <div style="width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+                <div id="speedProgressBar" style="width:20%;height:100%;background:#10b981;border-radius:3px;transition:width 0.4s ease;"></div>
+              </div>
+            </div>
+
+            <button class="btn-primary" id="btnRunSpeedTest" style="padding:0.75rem 2.5rem;font-size:0.9rem;font-weight:700;" onclick="runLiveSpeedTest()">
+              🚀 Run Live TR-143 Speed Test Now
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 5: VOIP SIP CONFIGURATION -->
+        <div class="mtab-content" id="mtab-voip">
+          <form id="formModalVoip">
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">VoIP Outbound Proxy:</label>
+                <input type="text" id="voipProxy" class="form-control mono" value="tg.ftth.ims.bsnl.in">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Outbound Proxy Port:</label>
+                <input type="text" id="voipObProxy" class="form-control mono" value="5060">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Registrar Server:</label>
+                <input type="text" id="voipRegServer" class="form-control mono" value="tg.ftth.ims.bsnl.in">
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">SIP Domain:</label>
+                <input type="text" id="voipSipDomain" class="form-control mono" value="tg.ftth.ims.bsnl.in">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Registration Expire (s):</label>
+                <input type="number" id="voipRegExpire" class="form-control mono" value="3600">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Registration Interval (s):</label>
+                <input type="number" id="voipRegInterval" class="form-control mono" value="120">
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">Codec 1:</label>
+                <select id="voipCodec1" class="form-control">
+                  <option value="G.722">G.722 (HD Voice)</option>
+                  <option value="G.711A">G.711 a-law</option>
+                  <option value="G.729">G.729</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Codec 2:</label>
+                <select id="voipCodec2" class="form-control">
+                  <option value="G.711A">G.711 a-law</option>
+                  <option value="G.722">G.722</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Heartbeat Cycle (s):</label>
+                <input type="number" id="voipHbCycle" class="form-control mono" value="60">
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label class="form-label">VoIP Status:</label>
+                <select id="voipStatus" class="form-control">
+                  <option value="Enabled">Enabled</option>
+                  <option value="Disabled">Disabled</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">SIP Auth Username:</label>
+                <input type="text" id="voipAuthUser" class="form-control mono" placeholder="+918549293277">
+              </div>
+              <div class="form-group">
+                <label class="form-label">SIP Auth Password:</label>
+                <input type="password" id="voipAuthPwd" class="form-control mono" placeholder="••••••••">
+              </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 1.25rem;">
+              <button type="button" class="btn-primary" style="padding: 0.75rem 2rem;" onclick="saveVoipConfig()">
+                💾 Update VoIP Parameters
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 6: OPTICAL TELEMETRY -->
+        <div class="mtab-content" id="mtab-optical">
+          <div class="tailadmin-card-grid" style="margin-bottom: 1.25rem;">
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">Current Rx Power:</div>
+              <div class="stat-number" style="color: #38bdf8;" id="modalRxPower">-- dBm</div>
+              <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;" id="modalRxHealthBadge">🟢 Normal</div>
+            </div>
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">First Inform Baseline:</div>
+              <div class="stat-number" style="color: #10b981;" id="modalInitialRxPower">-- dBm</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.25rem;" id="modalInitialRxTime">First Seen: --</div>
+            </div>
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">Lowest (Worst) Power:</div>
+              <div class="stat-number" style="color: #ef4444;" id="modalLowestRxPower">-- dBm</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.25rem;" id="modalLowestRxTime">Recorded: --</div>
+            </div>
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">Tx Laser Power:</div>
+              <div class="stat-number" style="color: #10b981;" id="modalTxPower">-- dBm</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.25rem;">Transceiver Output</div>
+            </div>
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">Laser Temperature:</div>
+              <div class="stat-number" style="color: #f59e0b;" id="modalOptTemp">-- °C</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.25rem;">Operating Temp</div>
+            </div>
+            <div class="tailadmin-stat-card">
+              <div class="stat-label">Working Voltage:</div>
+              <div class="stat-number" style="color: #8b5cf6;" id="modalOptVolt">3.3 V</div>
+              <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.25rem;">Supply Voltage</div>
+            </div>
+          </div>
+
+          <!-- LAST 20 SIGNIFICANT OPTICAL POWER FLUCTUATIONS (>= 1.0 dB CHANGE) -->
+          <div class="tailadmin-box" style="padding:1.15rem;margin-top:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+              <div>
+                <strong style="font-size:0.92rem;color:#ffffff;">📈 Significant Optical Power History (Last 20 Fluctuations ≥ 1.0 dB)</strong>
+                <div style="font-size:0.72rem;color:var(--text-body);">Records baseline and power variations greater than or equal to 1.0 dB with timestamp.</div>
+              </div>
+              <span class="tailadmin-badge primary" id="modalOptHistoryCountBadge" style="font-size:0.7rem;">0 Readings</span>
+            </div>
+            <div class="tailadmin-table-wrap" style="max-height:280px;overflow-y:auto;">
+              <table class="tailadmin-table" style="font-size:0.8rem;">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date & Time (IST)</th>
+                    <th>Rx Power (dBm)</th>
+                    <th>Tx Power (dBm)</th>
+                    <th>Delta Change</th>
+                    <th>Direction / Trend</th>
+                    <th>Health Status</th>
+                  </tr>
+                </thead>
+                <tbody id="modalOpticalHistoryTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">No optical fluctuation records yet. Initial baseline recorded upon first Inform.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 7: CUSTOMER & GIS -->
+        <div class="mtab-content" id="mtab-customer">
+          <form id="formModalCustomer">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Subscriber Name:</label>
+                <input type="text" id="custName" class="form-control" placeholder="">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Contact Phone Number:</label>
+                <input type="text" id="custPhone" class="form-control" placeholder="">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Billing Account ID:</label>
+                <input type="text" id="custAccountId" class="form-control mono" placeholder="">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Assigned FDP Splitter:</label>
+                <select id="custFdpSelect" class="form-control">
+                  <option value="">-- Direct to OLT / Unassigned --</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- INTERACTIVE PIN MAP -->
+            <div class="tailadmin-box" style="padding: 1rem; margin-bottom: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <label class="form-label" style="margin: 0;">📍 Rooftop GPS Pin Drop (Telangana / Hyderabad Grid):</label>
+                <button type="button" class="btn-outline" style="padding: 0.4rem 0.85rem;" onclick="captureCustomerLiveGps()">
+                  📱 Capture Live GPS
+                </button>
+              </div>
+              <div id="miniPinMap" style="height: 260px; width: 100%; border-radius: var(--radius-sm); background: #1A222C;"></div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Latitude:</label>
+                <input type="text" id="custLat" class="form-control mono" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Longitude:</label>
+                <input type="text" id="custLng" class="form-control mono" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Installation Address / Sector:</label>
+                <input type="text" id="custAddress" class="form-control" placeholder="">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Subscriber Notes / Line Remarks:</label>
+                <input type="text" id="custNotes" class="form-control" placeholder="">
+              </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 1.25rem;">
+              <button type="submit" class="btn-primary" style="padding: 0.75rem 2rem;">
+                💾 Save Customer Profile &amp; GIS Coordinates
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 8: DIAGNOSTICS & ACTIONS -->
+        <div class="mtab-content" id="mtab-actions">
+          <div style="background:#0b1120;border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+              <strong style="color:#38bdf8;font-size:0.95rem;">⚡ Real-Time IP Ping &amp; Packet Latency Diagnostic</strong>
+              <span id="pingStatusBadge" class="sa-badge-active" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.75rem;">Ready</span>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">
+              <input type="text" id="diagPingIpInput" class="form-control mono" placeholder="Target WAN IP (e.g. 100.74.12.34)" style="max-width:320px;">
+              <button type="button" class="btn-primary" style="padding:0.55rem 1.25rem;" onclick="runModalIpPing()">
+                🚀 Send ICMP Ping Packets
+              </button>
+            </div>
+            <pre id="diagPingOutputConsole" class="mono" style="background:#020617;border:1px solid rgba(255,255,255,0.1);padding:0.75rem;border-radius:6px;font-size:0.75rem;color:#cbd5e1;min-height:70px;max-height:160px;overflow-y:auto;white-space:pre-wrap;margin:0;">Click 'Send ICMP Ping Packets' to test network reachability &amp; latency from ACS server...</pre>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <button class="btn-outline" style="padding: 1rem;" onclick="triggerConnectionRequest()">
+              ⚡ Send Force Sync (TR-069)
+            </button>
+            <button class="btn-outline" style="padding: 1rem;" onclick="triggerBackupConfig()">
+              💾 Backup Configuration Dump
+            </button>
+            <button class="btn-outline" style="padding: 1rem;" onclick="triggerDeviceReboot()">
+              🔄 Remote Router Reboot
+            </button>
+            <button class="btn-outline" style="padding: 1rem; border-color: var(--warning); color: var(--warning);" onclick="triggerFactoryReset()">
+              ⚠️ Factory Reset Router
+            </button>
+            <button class="btn-outline" style="padding: 1rem; border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.1);" onclick="deleteCurrentSelectedDevice()">
+              🗑️ Delete ONT from Inventory
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: CREATE / PROVISION NEW SUBSCRIBER CUSTOMER
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modalCreateCustomer" style="display: none;">
+    <div class="modal-box" style="max-width: 840px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">➕ Provision &amp; Register New Subscriber ONT</h3>
+          <div style="font-size:0.8rem;color:#94a3b8;">Create Customer, PPPoE WAN, Dual-Band WiFi &amp; OLT PON Assignment</div>
+        </div>
+        <button class="btn-icon-action" onclick="closeCreateCustomerModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formCreateCustomer" onsubmit="handleCreateCustomerSubmit(event)">
+          <!-- Section 1: Customer Info -->
+          <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;margin-bottom:0.75rem;">1. Subscriber Details</div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Subscriber Full Name:</label>
+              <input type="text" id="newCustName" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mobile Number (WhatsApp):</label>
+              <input type="text" id="newCustPhone" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Billing Account ID:</label>
+              <input type="text" id="newCustAccount" class="form-control mono" placeholder="">
+            </div>
+          </div>
+
+          <!-- Section 2: PPPoE & WAN Configuration -->
+          <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;margin:1rem 0 0.75rem 0;">2. Internet &amp; WAN Credentials</div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">PPPoE Username:</label>
+              <input type="text" id="newPppoeUser" class="form-control mono" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">PPPoE Password:</label>
+              <input type="password" id="newPppoePass" class="form-control mono" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">VLAN ID (Tagging):</label>
+              <input type="number" id="newVlanId" class="form-control mono" value="203" min="1" max="4094">
+            </div>
+          </div>
+
+          <!-- Section 3: Dual-Band WiFi Configuration -->
+          <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;margin:1rem 0 0.75rem 0;">3. Wireless WiFi Setup</div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">2.4GHz WiFi Name (SSID):</label>
+              <input type="text" id="newWifi24Ssid" class="form-control mono" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">2.4GHz WiFi Password:</label>
+              <input type="text" id="newWifi24Pass" class="form-control mono" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">5GHz High-Speed WiFi Name:</label>
+              <input type="text" id="newWifi5Ssid" class="form-control mono" placeholder="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">5GHz WiFi Password:</label>
+              <input type="text" id="newWifi5Pass" class="form-control mono" placeholder="">
+            </div>
+          </div>
+
+          <!-- Section 4: Hardware & OLT PON Assignment -->
+          <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;margin:1rem 0 0.75rem 0;">4. Hardware &amp; OLT PON Assignment</div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Assigned OLT Device:</label>
+              <select id="newOltSelect" class="form-control">
+                <option value="SyroTech OLT-01">SyroTech OLT-01 (172.18.18.3)</option>
+                <option value="SyroTech OLT-02">SyroTech OLT-02 (Backup)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assigned PON Port:</label>
+              <select id="newPonPort" class="form-control">
+                <option value="EPON 0/1">EPON 0/1 (Port 1)</option>
+                <option value="EPON 0/2">EPON 0/2 (Port 2)</option>
+                <option value="EPON 0/3">EPON 0/3 (Port 3)</option>
+                <option value="EPON 0/4">EPON 0/4 (Port 4)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target ONU MAC / Serial:</label>
+              <input type="text" id="newOnuMac" class="form-control mono" placeholder="">
+            </div>
+          </div>
+
+          <!-- Section 5: Address & Location -->
+          <div class="form-grid-2" style="margin-top:0.75rem;">
+            <div class="form-group">
+              <label class="form-label">Installation Address / Area:</label>
+              <input type="text" id="newAddress" class="form-control" placeholder="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assigned FDP Splitter Box:</label>
+              <select id="newFdpSelect" class="form-control">
+                <option value="">-- Direct to OLT / Auto-Assign --</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="text-align: right; margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-outline" onclick="closeCreateCustomerModal()">Cancel</button>
+            <button type="submit" class="btn-primary" style="padding: 0.75rem 2.25rem;">
+              🎉 Save &amp; Provision Customer Now
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       4. OTHER MODALS (ZTP, Password, WhatsApp, etc.)
+       ========================================================================= -->
+  <!-- IN-SERVER WHATSAPP WEB ALERT ENGINE MODAL (Zero Paid API) -->
+  <div class="modal-backdrop" id="modalWhatsAppAlerts" style="display: none;">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📱 In-Server WhatsApp Web Multi-Device Alert Engine</h3>
+        <button class="btn-icon-action" onclick="closeWhatsAppModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Live Connection Status Banner -->
+        <div id="waStatusBanner" style="display:flex;align-items:center;justify-content:space-between;background:#101626;padding:1.1rem 1.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="width:44px;height:44px;border-radius:50%;background:rgba(16,185,129,0.15);color:#10b981;display:flex;align-items:center;justify-content:center;font-size:22px;">
+              📲
+            </div>
+            <div>
+              <div style="font-weight:700;color:#ffffff;font-size:0.95rem;" id="waStatusTitle">WhatsApp Web Socket: Checking...</div>
+              <div style="font-size:0.78rem;color:#94a3b8;" id="waStatusSubtitle">Direct internal socket session • Zero paid API fees</div>
+            </div>
+          </div>
+          <div>
+            <span class="tailadmin-badge primary" id="waLiveBadge">⏳ Initializing</span>
+          </div>
+        </div>
+
+        <!-- 2 Column Layout: Left QR / Session Control, Right: Config & Logs -->
+        <div style="display:grid;grid-template-columns: 240px 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+          <!-- Left: Live QR Container -->
+          <div style="background:#0b0f19;border:1px solid #1e293b;border-radius:8px;padding:1rem;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:260px;" id="waQrBoxContainer">
+            <div id="waQrLoading" style="color:#94a3b8;font-size:0.8rem;">
+              <div style="font-size:24px;margin-bottom:0.5rem;">🔄</div>
+              Generating WhatsApp QR...
+            </div>
+            <img id="waLiveQrImg" src="" alt="WhatsApp QR Code" style="display:none;width:180px;height:180px;border-radius:6px;background:#ffffff;padding:4px;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+            <div id="waConnectedInfo" style="display:none;color:#10b981;font-weight:700;font-size:0.9rem;">
+              <div style="font-size:36px;margin-bottom:0.25rem;">✅</div>
+              <div>Connected</div>
+              <div class="mono" style="font-size:0.8rem;color:#cbd5e1;margin-top:0.25rem;" id="waLinkedPhone"></div>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.4rem;flex-wrap:wrap;justify-content:center;">
+              <button type="button" class="btn-outline" style="padding:0.35rem 0.65rem;font-size:0.75rem;" onclick="refreshWaSessionQr()" id="btnRefreshQr">
+                🔄 Refresh QR
+              </button>
+              <button type="button" class="btn-outline" style="padding:0.35rem 0.65rem;font-size:0.75rem;color:#ef4444;border-color:rgba(239,68,68,0.4);" onclick="disconnectWaSession()" id="btnUnlinkWa">
+                🔌 Unlink
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Setup Instructions & Auto-Alert Rules -->
+          <div>
+            <form id="formWhatsAppConfig" onsubmit="event.preventDefault(); saveWhatsAppConfig();">
+              <div class="form-group" style="margin-bottom:0.75rem;">
+                <label class="form-label" style="font-size:0.82rem;">Operator Contact Phone (Alert Dispatch Target):</label>
+                <div style="display:flex;gap:0.5rem;">
+                  <span style="background:#1d2a3a;border:1px solid #3d4d60;padding:0.5rem 0.75rem;border-radius:6px;color:#94a3b8;font-weight:600;font-size:0.85rem;">+91</span>
+                  <input type="text" id="waOperatorPhone" class="form-control mono" placeholder="" value="" required style="padding:0.5rem 0.75rem;font-size:0.85rem;">
+                </div>
+              </div>
+
+              <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:6px;padding:0.75rem;margin-bottom:0.85rem;">
+                <div style="font-weight:700;color:#38bdf8;font-size:0.8rem;margin-bottom:0.35rem;">⚡ Automated Network Event Triggers:</div>
+                <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;color:#cbd5e1;cursor:pointer;margin-bottom:0.3rem;">
+                  <input type="checkbox" id="waAutoOutage" checked>
+                  <span>🔴 Dispatch instant WhatsApp alert when ONT drops Offline</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;color:#cbd5e1;cursor:pointer;margin-bottom:0.3rem;">
+                  <input type="checkbox" id="waAutoOptical" checked>
+                  <span>⚡ Alert when Rx Optical Power drops below -27 dBm</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;color:#cbd5e1;cursor:pointer;">
+                  <input type="checkbox" id="waNotifyTech" checked>
+                  <span>👨‍🔧 Auto-dispatch ticket notice to assigned Field Technician</span>
+                </label>
+              </div>
+
+              <!-- Test Dispatch Row -->
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <button type="button" class="btn-outline" style="padding:0.45rem 0.75rem;font-size:0.78rem;flex:1;" onclick="sendLiveWaTestMessage()">
+                  📲 Send Test Message
+                </button>
+                <button type="submit" class="btn-primary" style="padding:0.45rem 0.85rem;font-size:0.78rem;">
+                  💾 Save Preferences
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Recent Delivery Logs Table -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <strong style="color:#ffffff;font-size:0.85rem;">📋 Recent WhatsApp Message Dispatches</strong>
+            <button class="btn-outline" style="padding:0.2rem 0.5rem;font-size:0.72rem;" onclick="loadWaDeliveryLogs()">🔄 Refresh Logs</button>
+          </div>
+          <div style="max-height:140px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px;">
+            <table class="data-table" style="font-size:0.75rem;width:100%;">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Recipient</th>
+                  <th>Message Preview</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tblWaDeliveryLogs">
+                <tr><td colspan="4" style="text-align:center;padding:1rem;color:#64748b;">No recent dispatches logged.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSWORD CHANGE MODAL -->
+  <div class="modal-backdrop" id="modalChangePassword" style="display: none;">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔐 Operator Security Settings</h3>
+        <button class="btn-icon-action" onclick="closeChangePasswordModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formChangePassword" onsubmit="event.preventDefault(); handleChangePassword();">
+          <div class="form-group">
+            <label class="form-label">Current Password:</label>
+            <input type="password" id="pwdCurrent" class="form-control mono" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Secret Password:</label>
+            <input type="password" id="pwdNew" class="form-control mono" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password:</label>
+            <input type="password" id="pwdConfirm" class="form-control mono" required>
+          </div>
+          <div style="text-align: right; margin-top: 1.5rem;">
+            <button type="submit" class="btn-primary">
+              💾 Update Operator Password
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ZTP AUTO-PROVISIONING MODAL -->
+  <div class="modal-backdrop" id="modalZtp" style="display: none;">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">⚡ Zero-Touch Provisioning (ZTP) Rules</h3>
+        <button class="btn-icon-action" onclick="closeZtpModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-body); margin-bottom: 1.25rem;">
+          When an unprovisioned ONT sends its first 0 BOOTSTRAP Inform event, VRV ACS will automatically assign WAN VLAN, DNS, and WiFi configurations based on these rules.
+        </p>
+        <form onsubmit="event.preventDefault(); showToast('✅ ZTP rules saved successfully!', 'success'); closeZtpModal();">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Default Internet VLAN:</label>
+              <input type="number" class="form-control mono" value="203">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default VoIP VLAN:</label>
+              <input type="number" class="form-control mono" value="1830">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default WiFi Prefix:</label>
+            <input type="text" class="form-control mono" value="VRV_Fiber_">
+          </div>
+          <div style="text-align: right; margin-top: 1.25rem;">
+            <button type="submit" class="btn-primary">
+              💾 Save ZTP Profile
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT TECHNICIAN MODAL -->
+  <div class="modal-backdrop" id="modalAddTechnician" style="display: none;">
+    <div class="modal-box" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTechTitle">➕ Add Field Technician</h3>
+        <button class="btn-icon-action" onclick="closeTechnicianModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formAddTechnician" onsubmit="event.preventDefault(); saveTechnician();">
+          <input type="hidden" id="techEditId">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Technician Full Name *</label>
+              <input type="text" id="techName" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mobile Phone Number *</label>
+              <input type="text" id="techPhone" class="form-control mono" placeholder="" required>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Login Username (for /technician/) *</label>
+              <input type="text" id="techUsername" class="form-control mono" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Login Secret Password *</label>
+              <input type="password" id="techPassword" class="form-control mono" placeholder="" value="" required>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Assigned Service Zone / Mandal</label>
+              <input type="text" id="techArea" class="form-control" placeholder="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Account Status</label>
+              <select id="techStatus" class="form-control">
+                <option value="ACTIVE">ACTIVE (Authorized to Work)</option>
+                <option value="INACTIVE">INACTIVE / SUSPENDED</option>
+              </select>
+            </div>
+          </div>
+          <div style="text-align: right; margin-top: 1.5rem;">
+            <button type="button" class="btn-outline" onclick="closeTechnicianModal()" style="margin-right:0.5rem;">Cancel</button>
+            <button type="submit" class="btn-primary">💾 Save Technician Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GPON / EPON OLT UPLINK & CORE INTEGRATION MODAL
+       ===================================================================== -->
+  <div class="modal-backdrop" id="modalAddOlt" style="display: none;">
+    <div class="modal-box" style="max-width: 800px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span style="font-size: 1.5rem;">🏢</span>
+          <div>
+            <h3 class="modal-title" style="margin: 0;">GPON / EPON OLT Uplink & Core Substation Gateway</h3>
+            <div style="font-size: 0.78rem; color: var(--text-body);">Manage Headend OLT hardware, live PON laser diagnostics, and Web GUI gateways</div>
+          </div>
+        </div>
+        <button class="btn-icon-action" onclick="closeAddOltModal()">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem 1.5rem;">
+        <!-- Top Tab Selector -->
+        <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--strokedark); margin-bottom: 1.25rem; padding-bottom: 0.5rem;">
+          <button type="button" class="btn-outline active" id="btnOltTabList" onclick="switchOltModalTab('list')" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;">
+            📋 Connected OLT Fleet
+          </button>
+          <button type="button" class="btn-outline" id="btnOltTabAdd" onclick="switchOltModalTab('add')" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;">
+            ➕ Integrate New OLT
+          </button>
+          <button type="button" class="btn-outline" id="btnOltTabPons" onclick="switchOltModalTab('pons')" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;">
+            ⚡ Live PON Optical Ports
+          </button>
+        </div>
+
+        <!-- TAB 1: CONNECTED OLT FLEET -->
+        <div id="oltTabContentList">
+          <div class="tailadmin-table-wrap" style="max-height: 320px; overflow-y: auto; margin-bottom: 1rem;">
+            <table class="tailadmin-table" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>OLT Name & Substation</th>
+                  <th>Hardware Vendor</th>
+                  <th>Management URL / IP</th>
+                  <th>PON Ports</th>
+                  <th>Status</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tblOltListBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-body);">
+            <div>SNMP Trap Listener listening on <strong class="mono" style="color: #38bdf8;">UDP 162</strong></div>
+            <button type="button" class="btn-primary" onclick="switchOltModalTab('add')">➕ Add Another OLT</button>
+          </div>
+        </div>
+
+        <!-- TAB 2: INTEGRATE NEW OLT -->
+        <div id="oltTabContentAdd" style="display: none;">
+          <form id="formAddOlt" onsubmit="event.preventDefault(); saveNewOlt();">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">OLT / Substation Name *</label>
+                <input type="text" id="oltName" class="form-control" placeholder="e.g. Core Substation OLT-01" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hardware Vendor / Model *</label>
+                <select id="oltBrand" class="form-control" required>
+                  <option value="VSOL / C-Data (GPON 8-Port)">VSOL / C-Data (GPON 8-Port)</option>
+                  <option value="Syrotech 4-Port GPON/EPON">Syrotech 4-Port GPON/EPON</option>
+                  <option value="Huawei SmartAX MA5608T / MA5800">Huawei SmartAX MA5608T / MA5800</option>
+                  <option value="ZTE C320 / C300 GPON">ZTE C320 / C300 GPON</option>
+                  <option value="BDCOM GPON / EPON OLT">BDCOM GPON / EPON OLT</option>
+                  <option value="Netlink / GX OLT">Netlink / GX OLT</option>
+                  <option value="Generic Carrier OLT">Generic Carrier OLT</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Management IP / Host *</label>
+                <input type="text" id="oltHost" class="form-control mono" placeholder="172.18.18.3" value="172.18.18.3" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Port (SSH 22 / Telnet 23) *</label>
+                <input type="number" id="oltPort" class="form-control mono" placeholder="22" value="22" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">CLI / Web Protocol</label>
+                <select id="oltProtocol" class="form-control">
+                  <option value="ssh" selected>SSH (Port 22 - Recommended)</option>
+                  <option value="telnet">Telnet (Port 23)</option>
+                  <option value="https">HTTPS Web (Port 443)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Total PON Ports</label>
+                <select id="oltPonCount" class="form-control">
+                  <option value="4" selected>4 PON Ports (Syrotech Standard)</option>
+                  <option value="8">8 PON Ports (Up to 1024 ONTs)</option>
+                  <option value="16">16 PON Ports (Up to 2048 ONTs)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Admin Username *</label>
+                <input type="text" id="oltUsername" class="form-control mono" placeholder="admin" value="admin" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Secret Password *</label>
+                <input type="password" id="oltPassword" class="form-control mono" placeholder="••••••••" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">SNMP Community Read String</label>
+              <input type="text" id="oltSnmpCommunity" class="form-control mono" placeholder="public" value="public">
+            </div>
+
+            <!-- LIVE AUTHENTICATION FEEDBACK BOX -->
+            <div id="addOltAuthFeedback" style="display:none;padding:0.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:0.82rem;font-weight:600;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
+              <button type="button" class="btn-outline" id="btnTestOltAdd" onclick="testOltConnectionNow()">⚡ Test Credentials Now</button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn-outline" onclick="switchOltModalTab('list')">Cancel</button>
+                <button type="submit" class="btn-primary">💾 Save & Link OLT</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- TAB 3: LIVE PON OPTICAL PORTS -->
+        <div id="oltTabContentPons" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div style="font-weight: 700; color: #ffffff; font-size: 0.88rem;">Laser Diagnostics on Active PON Ports</div>
+            <button class="btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="loadOltPonsDiagnostics()">🔄 Re-scan PON Transceivers</button>
+          </div>
+          <div class="tailadmin-table-wrap" style="max-height: 300px; overflow-y: auto;">
+            <table class="tailadmin-table" style="font-size: 0.78rem;">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Laser Tx Power</th>
+                  <th>Transceiver Temp</th>
+                  <th>Bias Current</th>
+                  <th>Supply Voltage</th>
+                  <th>Active ONTs</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tblOltPonsBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT OLT MODAL -->
+  <div class="modal-backdrop" id="modalEditOlt" style="display: none;">
+    <div class="modal-box" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ Edit OLT Headend Configuration</h3>
+        <button class="btn-icon-action" onclick="closeEditOltModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="formEditOlt" onsubmit="event.preventDefault(); saveEditedOlt();">
+          <input type="hidden" id="editOltId">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">OLT Headend Name *</label>
+              <input type="text" id="editOltName" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hardware Vendor / Model</label>
+              <select id="editOltBrand" class="form-control">
+                <option value="Syrotech EPON OLT (4-Port)">Syrotech EPON OLT (4-Port)</option>
+                <option value="Syrotech GPON OLT (8-Port)">Syrotech GPON OLT (8-Port)</option>
+                <option value="VSOL / C-Data (GPON 8-Port)">VSOL / C-Data (GPON 8-Port)</option>
+                <option value="Huawei SmartAX (GPON)">Huawei SmartAX (GPON)</option>
+                <option value="BDCOM GPON / EPON OLT">BDCOM GPON / EPON OLT</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Host IP / FQDN *</label>
+              <input type="text" id="editOltHost" class="form-control mono" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Management Port (SSH/Telnet) *</label>
+              <input type="number" id="editOltPort" class="form-control mono" value="22" required>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">CLI Protocol</label>
+              <select id="editOltProtocol" class="form-control">
+                <option value="ssh">SSH (Port 22)</option>
+                <option value="telnet">Telnet (Port 23)</option>
+                <option value="https">HTTPS Web (Port 443)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Total PON Ports</label>
+              <input type="number" id="editOltPonCount" class="form-control mono" value="4">
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Admin Username</label>
+              <input type="text" id="editOltUsername" class="form-control mono" value="admin">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Admin Secret Password (Leave blank to keep unchanged)</label>
+              <input type="password" id="editOltPassword" class="form-control mono" placeholder="••••••••">
+            </div>
+          </div>
+
+          <!-- LIVE AUTHENTICATION FEEDBACK BOX -->
+          <div id="editOltAuthFeedback" style="display:none;padding:0.75rem 1rem;border-radius:6px;margin-top:1rem;margin-bottom:0.5rem;font-size:0.82rem;font-weight:600;"></div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
+            <button type="button" class="btn-outline" id="btnTestOltEdit" onclick="testEditedOltConnectionNow()">⚡ Test Credentials Now</button>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="btn-outline" onclick="closeEditOltModal()">Cancel</button>
+              <button type="submit" class="btn-primary">💾 Save OLT Changes</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEDICATED ONU CONFIGURATION & OPTICAL TELEMETRY INSPECTOR MODAL -->
+  <div class="modal-backdrop" id="modalOltOnuInspector" style="display: none;">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <div>
+          <div style="font-size: 0.75rem; color: #38bdf8; font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;" id="inspBreadcrumb">
+            SYROTECH EPON OLT HEADEND • 172.18.18.3
+          </div>
+          <h3 class="modal-title" id="inspOnuTitle">🔍 ONU Hardware Profile & Telemetry</h3>
+          <div style="font-size: 0.8rem; color: var(--text-body);" id="inspOnuSubtitle">Physical Port Configuration & Live Optical Signal</div>
+        </div>
+        <button class="btn-icon-action" onclick="window.closeOltOnuInspector()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 1. Top Card: Customer & MAC Overview -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:800;color:#ffffff;" id="inspCustName">RAJU (Subscriber)</div>
+            <div class="mono" style="font-size:0.8rem;color:#38bdf8;margin-top:0.2rem;">
+              MAC: <strong id="inspOnuMac">A8:E2:07:77:1B:C9</strong> • Port: <strong id="inspPonPort">EPON 0/2</strong> • ONU ID: <strong id="inspOnuId">#1</strong>
+            </div>
+            <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;" id="inspPhoneAccount">Account: 9951716316 • Phone: 9951716316</div>
+          </div>
+          <div style="text-align:right;">
+            <span class="tailadmin-badge success" id="inspOltStatusBadge">🟢 ONLINE (OLT)</span>
+            <div style="margin-top:0.35rem;">
+              <span class="tailadmin-badge primary" id="inspTr069StatusBadge">🟢 TR-069 SYNCED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Optical Telemetry & Fiber Distance Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:0.75rem;margin-bottom:1.25rem;">
+          <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:0.75rem;">
+            <div style="font-size:0.7rem;color:#94a3b8;">ONU RX POWER</div>
+            <div class="mono" style="font-size:1.15rem;font-weight:800;color:#10b981;" id="inspRxPower">-18.50 dBm</div>
+            <div style="font-size:0.65rem;color:#86efac;margin-top:0.2rem;">🟢 Optimal Signal (Loss < 22dB)</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.75rem;">
+            <div style="font-size:0.7rem;color:#94a3b8;">ONU TX LASER</div>
+            <div class="mono" style="font-size:1.15rem;font-weight:800;color:#38bdf8;" id="inspTxPower">+2.40 dBm</div>
+            <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.2rem;">Transceiver Active</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.75rem;">
+            <div style="font-size:0.7rem;color:#94a3b8;">FIBER DISTANCE</div>
+            <div class="mono" style="font-size:1.15rem;font-weight:800;color:#f59e0b;" id="inspFiberDistance">1,150 m</div>
+            <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.2rem;">Propagation Delay: 5.6µs</div>
+          </div>
+        </div>
+
+        <!-- 3. Physical OLT Running Configuration Details -->
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:1rem;margin-bottom:1.25rem;">
+          <div style="font-size:0.82rem;font-weight:700;color:#ffffff;margin-bottom:0.6rem;">📋 Physical OLT Ingested Configuration:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;font-size:0.78rem;">
+            <div><span style="color:#64748b;">WAN PPPoE User:</span> <strong class="mono" style="color:#ffffff;" id="inspPppUser">9951716316</strong></div>
+            <div><span style="color:#64748b;">WAN VLAN Tag:</span> <strong class="mono" style="color:#38bdf8;" id="inspVlanTag">VLAN 100</strong></div>
+            <div><span style="color:#64748b;">WiFi Hardware Radio:</span> <strong style="color:#10b981;" id="inspWifiSwitch">Enabled (802.11b/g/n)</strong></div>
+            <div><span style="color:#64748b;">Router Model:</span> <strong style="color:#ffffff;" id="inspRouterModel">Syrotech EPON ONU</strong></div>
+            <div style="grid-column:1 / -1;"><span style="color:#64748b;">CWMP ACS Server URL:</span> <strong class="mono" style="color:#a855f7;" id="inspCwmpUrl">https://ciniplay.in:7547/</strong></div>
+          </div>
+        </div>
+
+        <!-- 4. Action Buttons -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem;">
+          <button class="btn-outline" onclick="window.closeOltOnuInspector()">Close</button>
+          <div style="display:flex;gap:0.6rem;">
+            <button class="btn-primary" style="background:#0284c7;border-color:#0284c7;" onclick="window.openRouterWebGui(window.currentOltOnuInspectionData?._id || window.currentOltOnuInspectionData?.mac)">🎛️ Native Router Web GUI</button>
+            <button class="btn-primary" id="btnInspOpenDevice" onclick="window.openLinkedTr069Modal()">🌐 Edit Full TR-069 Profile</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       NATIVE BRAND EMBEDDED ROUTER WEB MANAGEMENT GUI (Remote ONT Control Console)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="modalRouterWebGui" style="display: none; z-index: 99999;">
+    <div class="modal-box" style="max-width: 1050px; width: 95vw; max-height: 94vh; padding: 0; display: flex; flex-direction: column; overflow: hidden; background: #0f172a; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);">
+      
+      <!-- 1. AUTHENTIC ROUTER BRAND TOP HEADER -->
+      <div id="routerGuiHeader" style="background: linear-gradient(90deg, #0b1329 0%, #1e293b 100%); padding: 0.85rem 1.5rem; border-bottom: 2px solid #38bdf8; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div id="routerBrandBadge" style="background: #38bdf8; color: #0b1329; font-weight: 900; font-size: 0.95rem; padding: 0.25rem 0.65rem; border-radius: 4px; letter-spacing: 0.5px;">
+            SYROTECH
+          </div>
+          <div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff;" id="routerModelHeader">SY-GPON-1110-WDONT Web Management Console</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.15rem;" class="mono">
+              PON Serial: <strong style="color: #38bdf8;" id="routerSnHeader">F3242A8E207771BC9</strong> • MAC: <strong style="color: #cbd5e1;" id="routerMacHeader">A8:E2:07:77:1B:C9</strong> • FW: <span id="routerFwHeader">V2.1.0</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span class="tailadmin-badge success" id="routerOnlineBadge">🟢 ONLINE</span>
+          <button class="btn-icon-action" style="color: #cbd5e1;" onclick="window.closeRouterWebGui()">✕</button>
+        </div>
+      </div>
+
+      <!-- 2. ROUTER SUB-NAV TABS -->
+      <div style="background: #1e293b; border-bottom: 1px solid #334155; padding: 0 1.5rem; display: flex; gap: 0.5rem; overflow-x: auto;">
+        <button class="gui-nav-tab active" data-tab="status" onclick="switchRouterGuiTab('status')">📊 Device Status</button>
+        <button class="gui-nav-tab" data-tab="wan" onclick="switchRouterGuiTab('wan')">🌐 WAN / PPPoE</button>
+        <button class="gui-nav-tab" data-tab="wlan" onclick="switchRouterGuiTab('wlan')">📶 Wi-Fi (2.4G & 5G)</button>
+        <button class="gui-nav-tab" data-tab="lan" onclick="switchRouterGuiTab('lan')">💻 LAN & DHCP Clients</button>
+        <button class="gui-nav-tab" data-tab="optical" onclick="switchRouterGuiTab('optical')">⚡ PON Optical Laser</button>
+        <button class="gui-nav-tab" data-tab="mgmt" onclick="switchRouterGuiTab('mgmt')">⚙️ Maintenance & Reboot</button>
+      </div>
+
+      <!-- 3. ROUTER GUI VIEWPORT CONTENT -->
+      <div style="padding: 1.5rem; overflow-y: auto; flex: 1; background: #0b1120;" id="routerGuiViewport">
+        
+        <!-- VIEW 1: DEVICE STATUS & WAN OVERVIEW -->
+        <div id="guiView-status" class="gui-view active">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <!-- Card 1: WAN Connection -->
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 0.75rem;">🌐 WAN Uplink (Internet)</div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Connection Mode:</span> <strong style="color:#fff;">PPPoE (Router)</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">PPPoE Username:</span> <strong class="mono" style="color:#38bdf8;" id="guiWanUser">9951716316</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Connection Status:</span> <span class="tailadmin-badge success">🟢 Connected</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">WAN IP Address:</span> <strong class="mono" style="color:#10b981;" id="guiWanIp">10.150.42.189</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Default Gateway:</span> <strong class="mono" style="color:#cbd5e1;" id="guiWanGateway">10.150.42.1</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Primary DNS:</span> <strong class="mono" style="color:#cbd5e1;">8.8.8.8, 1.1.1.1</strong></div>
+              </div>
+            </div>
+
+            <!-- Card 2: Optical Laser Power -->
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #10b981; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 0.75rem;">⚡ PON Laser Diagnostics</div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Optical Rx Power:</span> <strong class="mono" style="font-size:1.1rem;color:#10b981;" id="guiOpticalRx">-18.50 dBm</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Optical Tx Power:</span> <strong class="mono" style="color:#38bdf8;" id="guiOpticalTx">+2.40 dBm</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Transceiver Temp:</span> <strong class="mono" style="color:#cbd5e1;" id="guiOpticalTemp">42.5 °C</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Supply Voltage:</span> <strong class="mono" style="color:#cbd5e1;">3.31 V</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Fiber Line Status:</span> <strong style="color:#10b981;">🟢 Optimal Link (Low Attenuation)</strong></div>
+              </div>
+            </div>
+
+            <!-- Card 3: Wireless Access Point -->
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.25rem;">
+              <div style="font-weight: 700; color: #f59e0b; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 0.75rem;">📶 Wi-Fi 2.4GHz & 5GHz</div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">SSID Name:</span> <strong style="color:#fff;" id="guiWifiSsid">RAJUNENTA</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Security Mode:</span> <strong style="color:#cbd5e1;">WPA2-PSK (AES)</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Wi-Fi Password:</span> <strong class="mono" style="color:#f59e0b;" id="guiWifiPass">••••••••</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Radio Status:</span> <strong style="color:#10b981;">🟢 Active (Channel Auto)</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Active Devices:</span> <strong style="color:#fff;" id="guiWifiClientCount">4 Connected</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: WAN / PPPOE CONFIGURATION -->
+        <div id="guiView-wan" class="gui-view" style="display: none;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; max-width: 650px;">
+            <h4 style="color:#fff;margin-bottom:1rem;font-size:0.95rem;">🌐 WAN Uplink Connection Settings</h4>
+            <div class="form-group">
+              <label class="form-label">WAN Connection Type</label>
+              <select class="form-control" id="guiEditWanMode">
+                <option value="PPPoE" selected>PPPoE (Point-to-Point Protocol)</option>
+                <option value="DHCP">DHCP (Dynamic IP)</option>
+                <option value="Static">Static IP</option>
+                <option value="Bridge">Bridge Mode</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">PPPoE Username / Account ID</label>
+              <input type="text" class="form-control mono" id="guiEditPppUser">
+            </div>
+            <div class="form-group">
+              <label class="form-label">PPPoE Password</label>
+              <input type="password" class="form-control mono" id="guiEditPppPass" placeholder="Enter new PPPoE password">
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">VLAN ID Tag (802.1Q)</label>
+                <input type="number" class="form-control mono" id="guiEditVlan" value="100">
+              </div>
+              <div class="form-group">
+                <label class="form-label">MTU Size</label>
+                <input type="number" class="form-control mono" id="guiEditMtu" value="1492">
+              </div>
+            </div>
+            <button class="btn-primary" style="margin-top:1rem;" onclick="saveRouterWanConfig()">💾 Apply WAN Changes via TR-069</button>
+          </div>
+        </div>
+
+        <!-- VIEW 3: WLAN / WI-FI CONFIGURATION -->
+        <div id="guiView-wlan" class="gui-view" style="display: none;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; max-width: 650px;">
+            <h4 style="color:#fff;margin-bottom:1rem;font-size:0.95rem;">📶 Wireless AP Configuration (2.4GHz / 5GHz)</h4>
+            <div class="form-group">
+              <label class="form-label">Wireless Radio Switch</label>
+              <select class="form-control" id="guiEditWifiRadio">
+                <option value="1" selected>Enabled (Broadcast SSID)</option>
+                <option value="0">Disabled (Radio Off)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Wireless Network Name (SSID)</label>
+              <input type="text" class="form-control mono" id="guiEditWifiSsid">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Security Authentication Mode</label>
+              <select class="form-control" id="guiEditWifiSec">
+                <option value="WPA2-PSK" selected>WPA2-PSK (AES / Recommended)</option>
+                <option value="WPA/WPA2-PSK">WPA/WPA2 Mixed Mode</option>
+                <option value="Open">Open (No Security)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Wi-Fi WPA Pre-Shared Key (Password)</label>
+              <input type="text" class="form-control mono" id="guiEditWifiPass" placeholder="Enter new Wi-Fi password">
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Channel Selection</label>
+                <select class="form-control mono" id="guiEditWifiChannel">
+                  <option value="0" selected>Auto (Recommended)</option>
+                  <option value="1">Channel 1 (2412 MHz)</option>
+                  <option value="6">Channel 6 (2437 MHz)</option>
+                  <option value="11">Channel 11 (2462 MHz)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Transmit Power</label>
+                <select class="form-control mono">
+                  <option value="100" selected>100% (Maximum Coverage)</option>
+                  <option value="75">75%</option>
+                  <option value="50">50%</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn-primary" style="margin-top:1rem;" onclick="saveRouterWifiConfig()">💾 Push Wi-Fi Update to ONT</button>
+          </div>
+        </div>
+
+        <!-- VIEW 4: LAN & DHCP CONNECTED CLIENTS -->
+        <div id="guiView-lan" class="gui-view" style="display: none;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <h4 style="color:#fff;margin:0;font-size:0.95rem;">💻 Active Connected Devices (DHCP Leases)</h4>
+              <button class="btn-outline" style="padding:0.25rem 0.6rem;font-size:0.75rem;" onclick="refreshConnectedClientsList()">🔄 Refresh Clients</button>
+            </div>
+            <div class="tailadmin-table-wrap">
+              <table class="tailadmin-table" style="font-size:0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Hostname / Device Name</th>
+                    <th>Assigned IP Address</th>
+                    <th>MAC Address</th>
+                    <th>Interface</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tblGuiLanClients">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 5: OPTICAL PON HEALTH -->
+        <div id="guiView-optical" class="gui-view" style="display: none;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem;">
+              <h4 style="color:#10b981;margin-bottom:1rem;font-size:0.95rem;">⚡ Real-Time Optical Power Levels</h4>
+              <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.85rem;">
+                <div style="display:flex;justify-content:space-between;"><span>Received Optical Power (Rx):</span> <strong class="mono" style="color:#10b981;font-size:1.15rem;" id="guiOptDetailRx">-18.50 dBm</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Transmitted Optical Power (Tx):</span> <strong class="mono" style="color:#38bdf8;" id="guiOptDetailTx">+2.40 dBm</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Laser Bias Current:</span> <strong class="mono" style="color:#cbd5e1;">14.20 mA</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Internal Working Voltage:</span> <strong class="mono" style="color:#cbd5e1;">3.30 V</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Transceiver Module Temp:</span> <strong class="mono" style="color:#cbd5e1;">41.8 °C</strong></div>
+              </div>
+            </div>
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem;">
+              <h4 style="color:#38bdf8;margin-bottom:1rem;font-size:0.95rem;">🟢 Optical Link Health Criteria</h4>
+              <div style="font-size:0.8rem;color:#94a3b8;line-height:1.6;">
+                <div>🟢 <strong>Optimal:</strong> -14.00 dBm to -23.99 dBm</div>
+                <div>⚠️ <strong>Warning (High Loss):</strong> -24.00 dBm to -26.99 dBm</div>
+                <div>🔴 <strong>Critical (LOS/Fault):</strong> &lt; -27.00 dBm</div>
+                <hr style="border:none;border-top:1px solid #334155;margin:0.75rem 0;" />
+                <div style="color:#cbd5e1;">Signal Quality: <span style="color:#10b981;font-weight:700;">EXCELLENT (Zero Bit Error Rate)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 6: MAINTENANCE & REBOOT -->
+        <div id="guiView-mgmt" class="gui-view" style="display: none;">
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.5rem; max-width: 600px;">
+            <h4 style="color:#ef4444;margin-bottom:1rem;font-size:0.95rem;">⚙️ Remote Device Controls</h4>
+            <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:1.25rem;">
+              Trigger immediate hardware reboot or configuration reset on subscriber ONT via TR-069 RPC commands.
+            </p>
+            <div style="display:flex;gap:1rem;">
+              <button class="btn-primary" style="background:#ef4444;border-color:#ef4444;" onclick="triggerRemoteRouterReboot()">
+                🔄 Reboot ONT Hardware Now
+              </button>
+              <button class="btn-outline" onclick="triggerRemoteRouterDiagnostics()">
+                ⚡ Ping Gateway & Test Line
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 4. MODAL FOOTER -->
+      <div style="background: #0f172a; padding: 0.75rem 1.5rem; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 0.75rem; color: #64748b;" id="routerGuiFooterStatus">
+          Connected to Physical ONT via TR-069 CWMP Channel • Latency: 12ms
+        </div>
+        <button class="btn-outline" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;" onclick="window.closeRouterWebGui()">Close Console</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .gui-nav-tab {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .gui-nav-tab:hover {
+      color: #ffffff;
+    }
+    .gui-nav-tab.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+      font-weight: 700;
+    }
+    .gui-view {
+      display: none;
+    }
+    .gui-view.active {
+      display: block;
+    }
+  </style>
+
+  <!-- Javascript Logic -->
+  <script src="/app.js?v=7.0.0"></script>
+</body>
+</html>

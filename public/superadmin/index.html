@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRV ACS — Super Admin Dashboard</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- SuperAdmin Pixel-Perfect Styles -->
+  <link rel="stylesheet" href="/superadmin/style.css?v=8.0.0">
+
+  <!-- QRCode.js for dynamic NPCI UPI Payment Generation -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================
+       APP SHELL LAYOUT (Strictly hidden until 100% authenticated)
+       ========================================================= -->
+  <div class="sa-shell" id="saasDashboard" style="display:none !important;">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sa-sidebar" id="saSidebar">
+      <!-- BRAND LOGO -->
+      <div class="sa-brand-box">
+        <div class="sa-brand-logo">
+          <div class="sa-brand-icon-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+              <path d="M7 8h3m-3 4h6"></path>
+            </svg>
+          </div>
+          <div class="sa-brand-text">
+            <div class="sa-brand-title">VRV</div>
+            <div class="sa-brand-sub">— ACS —</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NAV SCROLL -->
+      <div class="sa-nav-scroll">
+        <!-- GROUP 1: SUPER ADMIN -->
+        <div class="sa-group-title">SUPER ADMIN</div>
+        <ul class="sa-nav-list">
+          <li>
+            <a class="sa-nav-item active nav-tab" data-tab="overview" onclick="switchSaasTab('overview')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">📊</span>
+                <span>Executive Overview</span>
+              </div>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 2: PLATFORM MANAGEMENT -->
+        <div class="sa-group-title">PLATFORM MANAGEMENT</div>
+        <ul class="sa-nav-list">
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="operators" onclick="switchSaasTab('operators')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🏢</span>
+                <span>Operators</span>
+              </div>
+              <span class="sa-badge-pill" id="tabCountOperators">1</span>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="operators" onclick="switchSaasTab('operators')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">📑</span>
+                <span>Operator KYC Directory</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="invoices" onclick="switchSaasTab('invoices')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🧾</span>
+                <span>B2B Tax Invoices</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="plans" onclick="switchSaasTab('plans')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">💳</span>
+                <span>SaaS Pricing Plans</span>
+              </div>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 3: QUICK OPERATIONS -->
+        <div class="sa-group-title">QUICK OPERATIONS</div>
+        <ul class="sa-nav-list">
+          <li>
+            <a class="sa-nav-item" onclick="openAddOperatorModal()">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">➕</span>
+                <span>Onboard New Operator</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item" onclick="openCreateInvoiceModal()">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🧾</span>
+                <span>Issue Tax Invoice</span>
+              </div>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 4: MONITORING & TOOLS -->
+        <div class="sa-group-title">MONITORING & TOOLS</div>
+        <ul class="sa-nav-list">
+          <li>
+            <a class="sa-nav-item" href="/" target="_blank">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🏢</span>
+                <span>Operator NOC Console ↗</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item" href="/technician/" target="_blank">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🔧</span>
+                <span>Field Technician App ↗</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="olt-fleet" onclick="switchSaasTab('olt-fleet')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🏢</span>
+                <span>Global OLT Headends</span>
+              </div>
+              <span class="sa-badge-pill" style="background:#3b82f6;color:#fff;" id="tabCountOlts">1</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- GROUP 5: SYSTEM & SETTINGS -->
+        <div class="sa-group-title">SYSTEM & SETTINGS</div>
+        <ul class="sa-nav-list">
+          <li>
+            <a class="sa-nav-item" data-tab="roles">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">👥</span>
+                <span>Roles & Permissions</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item" data-tab="audit">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">📋</span>
+                <span>Audit Logs</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item" data-tab="settings">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">⚙️</span>
+                <span>System Settings</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item nav-tab" data-tab="whatsapp-gateway" onclick="switchSaasTab('whatsapp-gateway')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">📱</span>
+                <span>Master WhatsApp Gateway</span>
+              </div>
+              <span class="sa-badge-pill" id="saWaStatusBadge" style="background:#10b981;color:#fff;">LIVE</span>
+            </a>
+          </li>
+          <li>
+            <a class="sa-nav-item" data-tab="status">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🔔</span>
+                <span>System Status</span>
+              </div>
+              <span class="sa-badge-pill" style="background:#10b981;">LIVE</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- SIDEBAR USER PILL & LOGOUT -->
+      <div class="sa-sidebar-user">
+        <div class="sa-user-card" onclick="logoutSuperAdmin()" title="Click to Sign Out">
+          <div class="sa-user-avatar">
+            👑
+            <div class="sa-online-dot"></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="sa-user-name">Platform Owner</div>
+            <div class="sa-user-role">SUPER_ADMIN</div>
+          </div>
+          <span style="font-size:14px;color:#ef4444;font-weight:700;" title="Sign Out">🚪</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <div class="sa-content-area">
+
+      <!-- TOP STICKY HEADER -->
+      <header class="sa-topbar">
+        <div style="display:flex;align-items:center;gap:1.25rem;">
+          <button class="sa-icon-btn" onclick="toggleSaSidebar()" title="Toggle Sidebar">
+            ☰
+          </button>
+          <div class="sa-search-box">
+            <span class="sa-search-icon">🔍</span>
+            <input type="text" id="searchOperatorInput" class="sa-search-input" placeholder="Search operators, phones, invoices..." oninput="filterOperatorsTable()">
+            <span class="sa-kbd-shortcut">⌘K</span>
+          </div>
+        </div>
+
+        <div class="sa-topbar-right">
+          <!-- Session Timer Badge (Auto-Logout in 15 mins) -->
+          <div style="font-size:0.75rem;color:#94a3b8;display:flex;align-items:center;gap:0.35rem;background:#101626;padding:0.35rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+            <span>⏱️ Session:</span>
+            <span id="sessionCountdown" class="mono font-bold" style="color:#38bdf8;">15:00</span>
+          </div>
+
+          <button class="sa-icon-btn" id="btnSaThemeToggle" onclick="toggleSuperAdminTheme()" title="Toggle Dark/Light Mode">
+            🌙
+          </button>
+
+          <button class="sa-icon-btn" title="CWMP Port 7547 Engine" onclick="showToast('TR-069 Engine operational on port 7547', 'info')">
+            🔔
+            <span class="sa-icon-badge" style="background:#10b981;">●</span>
+          </button>
+
+          <!-- Top User Profile Pill -->
+          <div class="sa-top-user-pill" title="Super Admin Account">
+            <div class="sa-top-user-avatar">👑</div>
+            <div class="sa-top-user-info">
+              <span class="sa-top-user-name">Super Admin</span>
+              <span class="sa-top-user-sub">Platform Master</span>
+            </div>
+          </div>
+
+          <!-- Explicit Red Sign Out Button -->
+          <button class="btn-sa-secondary" onclick="logoutSuperAdmin()" style="border-color:rgba(239,68,68,0.3);color:#fca5a5;padding:0.45rem 0.85rem;" title="Sign out of Super Admin">
+            🚪 Sign Out
+          </button>
+        </div>
+      </header>
+
+      <!-- SCROLLABLE MAIN VIEWPORT -->
+      <main class="sa-main-viewport">
+
+        <!-- =========================================================
+             VIEW 1: EXECUTIVE OVERVIEW (REAL FLEET DATA)
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view active" id="view-overview">
+          <!-- PAGE HEADLINE -->
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">Super Admin Dashboard 👑</h1>
+              <div class="sa-page-subtitle">Real-time platform overview and live carrier-grade performance metrics</div>
+            </div>
+            <div class="sa-header-actions">
+              <button class="btn-sa-primary" onclick="openAddOperatorModal()">
+                + Onboard Operator
+              </button>
+              <button class="btn-sa-secondary" onclick="openCreateInvoiceModal()">
+                🧾 Issue Tax Invoice
+              </button>
+            </div>
+          </div>
+
+          <!-- TOP 4 STAT CARDS ROW (REAL DATA) -->
+          <div class="sa-stat-grid">
+            <!-- CARD 1: REAL MRR -->
+            <div class="sa-stat-card">
+              <span class="sa-stat-sparkle">✦</span>
+              <div class="sa-stat-icon-circle purple">
+                💳
+              </div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Monthly Recurring Revenue</span>
+                <span class="sa-stat-value mono" id="kpiMRR">₹2,999</span>
+                <span class="sa-stat-sub">Real active tenant revenue</span>
+                <span class="sa-stat-trend" id="kpiMrrTrend">↑ 100% active billing</span>
+              </div>
+            </div>
+
+            <!-- CARD 2: REAL OPERATORS -->
+            <div class="sa-stat-card">
+              <span class="sa-stat-sparkle">✦</span>
+              <div class="sa-stat-icon-circle blue">
+                👥
+              </div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Total Operators</span>
+                <span class="sa-stat-value mono" id="kpiOperators">1</span>
+                <span class="sa-stat-sub" id="kpiActiveTenants">1 Active • 0 Suspended</span>
+                <span class="sa-stat-trend" style="color:#10b981;">● 100% Operational</span>
+              </div>
+            </div>
+
+            <!-- CARD 3: REAL MANAGED CPE FLEET -->
+            <div class="sa-stat-card">
+              <span class="sa-stat-sparkle">✦</span>
+              <div class="sa-stat-icon-circle green">
+                📟
+              </div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Managed CPE Fleet</span>
+                <span class="sa-stat-value mono" id="kpiTotalOnts">10</span>
+                <span class="sa-stat-sub">Live customer routers</span>
+                <span class="sa-stat-trend mixed">
+                  <span style="color:#10b981;font-weight:700;">🟢 <span id="kpiOnlineOnts">9</span> Online</span> • 
+                  <span style="color:#ef4444;font-weight:700;">🔴 <span id="kpiCriticalOnts">1</span> Critical</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- CARD 4: OFFLINE ONTs -->
+            <div class="sa-stat-card">
+              <span class="sa-stat-sparkle">✦</span>
+              <div class="sa-stat-icon-circle red">
+                🔴
+              </div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Offline ONTs</span>
+                <span class="sa-stat-value mono" id="kpiOfflineOntsCount" style="color:#ef4444;">1</span>
+                <span class="sa-stat-sub">Immediate dispatch needed</span>
+                <span class="sa-stat-trend" style="color:#ef4444;" id="kpiOfflineTrend">🔴 1 ONT Offline</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- MIDDLE 3-CARDS ROW (MRR CHART, PLATFORM HEALTH, OPERATOR STATUS) -->
+          <div class="sa-middle-grid">
+            <!-- 1. MRR OVERVIEW CHART -->
+            <div class="sa-card-box">
+              <div class="sa-card-header">
+                <span class="sa-card-title">MRR Overview</span>
+                <select class="sa-dropdown-pill">
+                  <option>Last 6 Months</option>
+                  <option>Current FY 2025-2026</option>
+                </select>
+              </div>
+              <div class="sa-chart-canvas-wrap">
+                <canvas id="mrrOverviewChart" width="460" height="190"></canvas>
+              </div>
+            </div>
+
+            <!-- 2. PLATFORM HEALTH -->
+            <div class="sa-card-box">
+              <div class="sa-card-header">
+                <span class="sa-card-title">Platform Health</span>
+                <a class="sa-card-link" href="javascript:void(0)" onclick="showToast('All 6 platform microservices active', 'info')">View Status</a>
+              </div>
+              <div class="sa-health-list">
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#10b981;font-size:12px;">🟢</span>
+                    <span>CWMP TR-069 Engine (:7547)</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#38bdf8;font-size:12px;">🌐</span>
+                    <span>REST API & WebSockets</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#10b981;font-size:12px;">🗄️</span>
+                    <span>MongoDB Database</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#10b981;font-size:12px;">💳</span>
+                    <span>B2B Tax Billing Engine</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#10b981;font-size:12px;">📡</span>
+                    <span>SNMP Trap Daemon (:162)</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+
+                <div class="sa-health-item">
+                  <div class="sa-health-name">
+                    <span style="color:#10b981;font-size:12px;">💾</span>
+                    <span>Database Backups</span>
+                  </div>
+                  <span class="sa-health-badge operational">Operational</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. OPERATOR STATUS DONUT -->
+            <div class="sa-card-box">
+              <div class="sa-card-header">
+                <span class="sa-card-title">Operator Status</span>
+              </div>
+              <div class="sa-donut-wrap">
+                <div class="sa-donut-circle-box">
+                  <canvas id="operatorStatusDonut" width="130" height="130"></canvas>
+                  <div class="sa-donut-center-text">
+                    <span class="sa-donut-val" id="donutTotalVal">1</span>
+                    <span class="sa-donut-lbl">Total</span>
+                  </div>
+                </div>
+                <div class="sa-donut-legend-col">
+                  <div class="sa-legend-item">
+                    <span class="sa-legend-dot" style="background:#10b981;"></span>
+                    <span>Active <strong id="legendActiveCount">1 (100%)</strong></span>
+                  </div>
+                  <div class="sa-legend-item">
+                    <span class="sa-legend-dot" style="background:#f59e0b;"></span>
+                    <span>Suspended <strong id="legendSuspendedCount">0 (0%)</strong></span>
+                  </div>
+                  <div class="sa-legend-item">
+                    <span class="sa-legend-dot" style="background:#64748b;"></span>
+                    <span>Inactive <strong>0 (0%)</strong></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NEW WIDGET: OFFLINE ONTs -->
+          <div class="sa-card-box" style="margin-bottom: 1.5rem;">
+            <div class="sa-card-header">
+              <div>
+                <span class="sa-card-title" style="color:#ef4444;">🔴 Offline Subscriber ONTs</span>
+                <span style="font-size:0.75rem;color:#94a3b8;margin-left:0.5rem;">(Live Fleet Real-Time Monitoring)</span>
+              </div>
+              <a class="sa-card-link" href="/" target="_blank">Open Operator NOC Console ↗</a>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>SUBSCRIBER</th>
+                    <th>OPERATOR</th>
+                    <th>PON SERIAL / MAC</th>
+                    <th>OPTICAL RX POWER</th>
+                    <th>STATUS / LAST SEEN</th>
+                    <th style="text-align:right;">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="tblOfflineCriticalOnts">
+                  <tr><td colspan="6" style="text-align:center;padding:1.5rem;color:#64748b;">Checking fleet for offline or critical ONTs...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- BOTTOM 2-CARDS ROW (RECENT OPERATORS, RECENT REAL ALERTS) -->
+          <div class="sa-bottom-grid">
+            <!-- 1. RECENT ACTIVE OPERATORS -->
+            <div class="sa-card-box">
+              <div class="sa-card-header">
+                <span class="sa-card-title">Recent Operators</span>
+                <a class="sa-card-link" href="javascript:void(0)" onclick="switchSaasTab('operators')">View All Operators →</a>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="sa-table">
+                  <thead>
+                    <tr>
+                      <th>OPERATOR NAME</th>
+                      <th>CONTACT</th>
+                      <th>STATUS</th>
+                      <th>ONBOARDED ON</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblRecentOperators">
+                    <!-- Populated dynamically from real DB -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 2. RECENT REAL SYSTEM ALERTS -->
+            <div class="sa-card-box">
+              <div class="sa-card-header">
+                <span class="sa-card-title">Real-Time System Events</span>
+                <a class="sa-card-link" href="javascript:void(0)" onclick="loadSuperAdminDashboard()">🔄 Refresh</a>
+              </div>
+              <div class="sa-alert-list" id="realAlertsList">
+                <!-- Dynamically populated from real device fleet -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 2: OPERATOR KYC DIRECTORY (FULL TABLE)
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-operators">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">🏢 Operator KYC & Fleet Directory</h1>
+              <div class="sa-page-subtitle">Complete profile data, business address, Aadhaar & GSTIN records, and fleet capacity</div>
+            </div>
+            <button class="btn-sa-primary" onclick="openAddOperatorModal()">
+              ➕ Onboard New Operator (Full KYC)
+            </button>
+          </div>
+
+          <div class="sa-card-box" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>Operator Network</th>
+                    <th>Owner & Contact</th>
+                    <th>Full Business Location</th>
+                    <th>KYC Records</th>
+                    <th>CWMP URL Path</th>
+                    <th>Fleet Capacity</th>
+                    <th>Plan Fee</th>
+                    <th>Account Status</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tblOperatorsDirectory">
+                  <tr><td colspan="9" style="text-align:center;padding:2.5rem;color:#64748b;">Loading verified operators...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 3: B2B TAX INVOICES & SETTLEMENT
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-invoices">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">🧾 B2B GST Tax Invoices & Settlement</h1>
+              <div class="sa-page-subtitle">Monthly automated billing, GST breakdowns (CGST+SGST 18%), and dynamic UPI QR payments</div>
+            </div>
+            <button class="btn-sa-primary" onclick="openCreateInvoiceModal()">
+              ➕ Generate New Tax Invoice
+            </button>
+          </div>
+
+          <div class="sa-card-box" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>Invoice #</th>
+                    <th>Billed Operator</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Subtotal (₹)</th>
+                    <th>GST 18% (₹)</th>
+                    <th>Total (₹)</th>
+                    <th>Payment Status</th>
+                    <th style="text-align:right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tblInvoicesList">
+                  <tr><td colspan="9" style="text-align:center;padding:2.5rem;color:#64748b;">Loading invoices...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 4: SAAS PRICING PLANS
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-plans">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">💳 Multi-Tenant SaaS Subscription Tiers</h1>
+              <div class="sa-page-subtitle">Carrier-grade tier structures, hardware limits, and monthly recurring pricing</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1.5rem;" id="pricingPlansContainer">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 5: ROLES & MULTI-TENANT PERMISSIONS
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-roles">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">👥 Roles & Multi-Tenant Permissions Matrix</h1>
+              <div class="sa-page-subtitle">Granular Role-Based Access Control (RBAC) across Platform Super Admins, Operators, and Field Technicians</div>
+            </div>
+            <button class="btn-sa-primary" onclick="saveRolesPermissions()">
+              💾 Save Permissions Policy
+            </button>
+          </div>
+
+          <!-- ROLE SUMMARY CARDS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem;margin-bottom:1.5rem;" id="rolesSummaryGrid">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- PERMISSION MATRIX TABLE -->
+          <div class="sa-card-box" style="padding:0;overflow:hidden;">
+            <div class="sa-card-header" style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--sa-border);">
+              <span class="sa-card-title">Detailed RBAC Privilege Capabilities</span>
+              <span style="font-size:0.78rem;color:#94a3b8;">Click checkboxes to adjust role scope</span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>Privilege Capability</th>
+                    <th>SUPER_ADMIN (Owner)</th>
+                    <th>OPERATOR_ADMIN (NOC)</th>
+                    <th>FIELD_TECHNICIAN (App)</th>
+                    <th>SUBSCRIBER (Self-Care)</th>
+                  </tr>
+                </thead>
+                <tbody id="tblPermissionsMatrix">
+                  <tr>
+                    <td><strong>Onboard / Suspend Operators</strong><div style="font-size:0.72rem;color:#64748b;">Manage tenant accounts and billing cycles</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>B2B Tax Invoicing & Pricing</strong><div style="font-size:0.72rem;color:#64748b;">Generate GST tax invoices and adjust SaaS pricing</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Customer WAN / PPPoE Provisioning</strong><div style="font-size:0.72rem;color:#64748b;">Assign VLAN, username, password, and TR-069 profiles</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" checked id="permOpWan"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" checked id="permTechWan"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Remote Router Reboot & Sync (Port 7547)</strong><div style="font-size:0.72rem;color:#64748b;">Dispatch TR-069 Connection Request & reboot RPC</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" checked id="permOpReboot"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" checked id="permTechReboot"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" checked id="permCustReboot"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Factory Reset CPE (Hard Reset)</strong><div style="font-size:0.72rem;color:#64748b;">Wipe customer router to default factory settings</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" checked id="permOpReset"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" id="permTechReset"> <span style="color:#64748b;">Restricted</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Batch Firmware OTA Upgrade Push</strong><div style="font-size:0.72rem;color:#64748b;">Roll out binary firmware image to fleet of ONTs</div></td>
+                    <td><input type="checkbox" checked disabled> <span style="color:#10b981;font-weight:700;">Full</span></td>
+                    <td><input type="checkbox" checked id="permOpFw"> <span style="color:#38bdf8;font-weight:600;">Granted</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                    <td><input type="checkbox" disabled> <span style="color:#64748b;">Denied</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 6: ENTERPRISE AUDIT & SECURITY LOGS
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-audit">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">📋 Enterprise Audit Trail & Security Logs</h1>
+              <div class="sa-page-subtitle">Tamper-proof real-time security events, operator actions, and TR-069 inform transactions</div>
+            </div>
+            <div style="display:flex;gap:0.75rem;">
+              <button class="btn-sa-secondary" onclick="loadAuditLogs()">
+                🔄 Refresh Logs
+              </button>
+              <button class="btn-sa-primary" onclick="exportAuditLogsCsv()">
+                📥 Export CSV Audit Trail
+              </button>
+            </div>
+          </div>
+
+          <!-- LOG FILTERS TOOLBAR -->
+          <div class="sa-card-box" style="padding:1rem 1.5rem;margin-bottom:1.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+              <div style="flex:1;max-width:350px;">
+                <input type="text" id="inputSearchAudit" class="form-control" placeholder="Search actor, action, IP, or message..." onkeyup="filterAuditLogsTable()">
+              </div>
+              <div style="display:flex;gap:0.75rem;">
+                <select id="selectAuditSeverity" class="form-control" style="width:auto;" onchange="filterAuditLogsTable()">
+                  <option value="ALL">All Severities</option>
+                  <option value="INFO">Info & Normal</option>
+                  <option value="WARN">Warnings & Outages</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- AUDIT LOGS TABLE -->
+          <div class="sa-card-box" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Actor / Operator</th>
+                    <th>Action Type</th>
+                    <th>Target Device / Entity</th>
+                    <th>Severity</th>
+                    <th>Audit Message & Details</th>
+                    <th>Source IP</th>
+                  </tr>
+                </thead>
+                <tbody id="tblAuditLogsList">
+                  <tr><td colspan="7" style="text-align:center;padding:2.5rem;color:#64748b;">Loading real-time audit logs...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             VIEW 7: SYSTEM SETTINGS & GLOBAL CONFIGURATION
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-settings">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">⚙️ Global Platform Settings & CWMP Engine</h1>
+              <div class="sa-page-subtitle">Cloud ACS daemon ports, session security parameters, database connections, and backup policies</div>
+            </div>
+          </div>
+
+          <form id="formGlobalSettings" onsubmit="event.preventDefault(); saveGlobalSettings();">
+            <div class="sa-card-box" style="margin-bottom:1.5rem;">
+              <div class="sa-card-header">
+                <span class="sa-card-title">📡 1. TR-069 CWMP Engine Protocol Configuration</span>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">CWMP SOAP Listening Port *</label>
+                  <input type="number" id="cfgCwmpPort" class="form-control mono" value="7547" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Default Periodic Inform Interval (Seconds) *</label>
+                  <input type="number" id="cfgInformInterval" class="form-control mono" value="60" required>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Connection Request Default Username *</label>
+                  <input type="text" id="cfgCwmpUser" class="form-control mono" value="admin" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Connection Request Default Password *</label>
+                  <input type="password" id="cfgCwmpPass" class="form-control mono" value="cpe123" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="sa-card-box" style="margin-bottom:1.5rem;">
+              <div class="sa-card-header">
+                <span class="sa-card-title">🔐 2. Session Security & Multi-Tenant Policies</span>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Auto-Logout Inactivity Timeout (Minutes) *</label>
+                  <input type="number" id="cfgSessionTimeout" class="form-control mono" value="15" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">SNMP Trap Listening Port (UDP) *</label>
+                  <input type="number" id="cfgSnmpPort" class="form-control mono" value="162" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="sa-card-box" style="margin-bottom:1.5rem;">
+              <div class="sa-card-header">
+                <span class="sa-card-title">🗄️ 3. Database Engine & Automated Storage Backups</span>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">MongoDB Connection String</label>
+                  <input type="text" id="cfgMongoUri" class="form-control mono" value="mongodb://127.0.0.1:27017/tr069_acs" readonly style="background:rgba(255,255,255,0.05);">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Automated Snapshot Backup Frequency</label>
+                  <select id="cfgBackupFreq" class="form-control">
+                    <option value="DAILY_02AM">Daily Snapshot (02:00 AM IST)</option>
+                    <option value="HOURLY">Every Hour</option>
+                    <option value="WEEKLY">Weekly Full Backup</option>
+                  </select>
+                </div>
+              </div>
+              <div style="text-align:right;margin-top:1.5rem;">
+                <button type="submit" class="btn-sa-primary">
+                  💾 Save Global Settings
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- =========================================================
+             VIEW 8: SYSTEM LIVE STATUS & ENGINE HEALTH
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-status">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">🔔 Platform Live Status & Microservices Health</h1>
+              <div class="sa-page-subtitle">Real-time Node.js runtime metrics, socket port listeners, and active fleet telemetry</div>
+            </div>
+            <button class="btn-sa-primary" onclick="loadSystemLiveStatus()">
+              🔄 Run Diagnostic Sweep
+            </button>
+          </div>
+
+          <!-- TOP 4 RUNTIME CARDS -->
+          <div class="sa-stat-grid" style="margin-bottom:1.5rem;">
+            <div class="sa-stat-card">
+              <div class="sa-stat-icon-circle green">⏱️</div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">System Uptime</span>
+                <span class="sa-stat-value mono" id="statUptimeDisplay">3d 14h 22m</span>
+                <span class="sa-stat-sub">Zero reboot interruptions</span>
+              </div>
+            </div>
+
+            <div class="sa-stat-card">
+              <div class="sa-stat-icon-circle blue">🧠</div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Memory Heap Used</span>
+                <span class="sa-stat-value mono" id="statMemoryDisplay">42.8 MB</span>
+                <span class="sa-stat-sub">Optimized garbage collection</span>
+              </div>
+            </div>
+
+            <div class="sa-stat-card">
+              <div class="sa-stat-icon-circle purple">⚡</div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">CWMP Port 7547</span>
+                <span class="sa-stat-value mono" style="color:#10b981;">ACTIVE</span>
+                <span class="sa-stat-sub">SOAP Informs processing</span>
+              </div>
+            </div>
+
+            <div class="sa-stat-card">
+              <div class="sa-stat-icon-circle amber">🗄️</div>
+              <div class="sa-stat-info">
+                <span class="sa-stat-label">Database Status</span>
+                <span class="sa-stat-value mono" style="color:#10b981;">CONNECTED</span>
+                <span class="sa-stat-sub">MongoDB wire protocol</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- MICROSERVICES STATUS TABLE -->
+          <div class="sa-card-box" style="padding:0;overflow:hidden;">
+            <div class="sa-card-header" style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--sa-border);">
+              <span class="sa-card-title">Live Port Listeners & Microservices Health</span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>Microservice Daemon</th>
+                    <th>Port / Socket</th>
+                    <th>Protocol</th>
+                    <th>Health Status</th>
+                    <th>Throughput / Latency</th>
+                    <th style="text-align:right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tblServicesStatus">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION: GLOBAL OLT HEADEND FLEET & MULTI-TENANT MONITORING
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-olt-fleet" style="display: none;">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">🏢 Global OLT Headends & Carrier Uplinks</h1>
+              <p class="sa-page-subtitle">Physical Syrotech / VSOL Headend Telemetry, PON SFP Lasers & TR-069 CPE Matching</p>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+              <select id="saOltTenantFilter" class="form-control" style="width:auto;" onchange="loadSuperAdminOlts()">
+                <option value="ALL">All Operators</option>
+                <option value="rudra">Rudra FiberNet</option>
+                <option value="vgigafiber">V GIGA FIBER (Vaishnavi)</option>
+              </select>
+              <button class="sa-btn-primary" onclick="loadSuperAdminOlts()">
+                ⚡ Refresh OLT Fleet
+              </button>
+            </div>
+          </div>
+
+          <div class="sa-card-box" style="margin-bottom:1.5rem;">
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>OLT HEADEND NAME</th>
+                    <th>OPERATOR</th>
+                    <th>HOST IP / PORT</th>
+                    <th>VENDOR / MODEL</th>
+                    <th>PON / ONTS</th>
+                    <th>CPU / MEM / TEMP</th>
+                    <th>STATUS</th>
+                    <th style="text-align:right;">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="tblSaOltFleet">
+                  <tr><td colspan="8" style="text-align:center;padding:1.5rem;color:#64748b;">Loading global OLT fleet...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION: MASTER WHATSAPP GATEWAY (CENTRAL OTP ENGINE)
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-whatsapp-gateway" style="display: none;">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">📱 Master WhatsApp Web OTP Gateway</h1>
+              <p class="sa-page-subtitle">Central In-Server WhatsApp Web Multi-Device Session for Operator Passwordless OTP Logins & Outage Dispatches</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:center;">
+              <span class="sa-badge-active" id="saWaEngineBadge" style="background:rgba(16,185,129,0.15);color:#10b981;padding:0.4rem 0.85rem;border-radius:20px;font-size:0.8rem;font-weight:700;">
+                🟢 ENGINE ACTIVE
+              </span>
+              <button class="sa-btn-primary" onclick="loadSaWaStatus()">
+                🔄 Refresh Gateway
+              </button>
+            </div>
+          </div>
+
+          <!-- 2-COLUMN GRID -->
+          <div style="display:grid;grid-template-columns: 360px 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+            <!-- CARD 1: QR & SESSION STATUS -->
+            <div class="sa-card-box" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:360px;">
+              <div style="font-weight:700;font-size:1rem;color:#ffffff;margin-bottom:0.25rem;">WhatsApp Web Linking</div>
+              <div style="font-size:0.78rem;color:#94a3b8;margin-bottom:1.25rem;">Scan QR code with WhatsApp on phone (Linked Devices)</div>
+
+              <div id="saWaQrLoading" style="color:#94a3b8;font-size:0.85rem;margin:1.5rem 0;">
+                <div style="font-size:32px;margin-bottom:0.5rem;">🔄</div>
+                Initializing WhatsApp Gateway...
+              </div>
+
+              <img id="saWaQrImg" src="" alt="WhatsApp QR Code" style="display:none;width:220px;height:220px;border-radius:10px;background:#ffffff;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);margin-bottom:1rem;">
+
+              <div id="saWaConnectedBox" style="display:none;padding:1.5rem 1rem;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;width:100%;box-sizing:border-box;">
+                <div style="font-size:42px;margin-bottom:0.5rem;">✅</div>
+                <div style="color:#10b981;font-weight:800;font-size:1.05rem;">WhatsApp Web Connected</div>
+                <div class="mono" style="color:#ffffff;font-size:0.95rem;font-weight:700;margin-top:0.35rem;" id="saWaLinkedNumber"></div>
+                <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.35rem;">Multi-Device Active Session (Zero Paid APIs)</div>
+              </div>
+
+              <div style="margin-top:1.25rem;display:flex;gap:0.5rem;justify-content:center;width:100%;">
+                <button type="button" class="btn-sa-secondary" onclick="initSaWaSession()" id="btnSaRefreshQr">
+                  🔄 Generate / Refresh QR
+                </button>
+                <button type="button" class="btn-sa-secondary" style="color:#ef4444;border-color:rgba(239,68,68,0.3);" onclick="disconnectSaWaSession()" id="btnSaUnlink">
+                  🔌 Unlink Session
+                </button>
+              </div>
+            </div>
+
+            <!-- CARD 2: GATEWAY LIVE TEST & INSTRUCTIONS -->
+            <div style="display:flex;flex-direction:column;gap:1.5rem;">
+              <div class="sa-card-box">
+                <div class="sa-card-title" style="margin-bottom:0.75rem;">⚡ Real-Time OTP Dispatch Tester</div>
+                <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:1rem;">
+                  Send a live test OTP to any mobile number to verify end-to-end WhatsApp delivery:
+                </p>
+                <form id="formSaWaTest" onsubmit="event.preventDefault(); sendSaWaTestOtp();" style="display:flex;gap:0.75rem;">
+                  <input type="tel" id="saWaTestPhone" class="form-control mono" placeholder="" style="flex:1;" required>
+                  <button type="submit" class="sa-btn-primary" id="btnSendSaWaTest">
+                    📲 Send Test WhatsApp OTP
+                  </button>
+                </form>
+                <div id="saWaTestFeedback" style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:6px;font-size:0.82rem;font-weight:600;"></div>
+              </div>
+
+              <div class="sa-card-box" style="background:rgba(59,130,246,0.04);border:1px solid rgba(59,130,246,0.15);">
+                <div style="font-weight:700;color:#38bdf8;font-size:0.9rem;margin-bottom:0.5rem;">🔒 How Master WhatsApp OTP Authentication Operates</div>
+                <div style="font-size:0.8rem;color:#cbd5e1;line-height:1.6;">
+                  <p>1. <strong>Passwordless Operator Security:</strong> When an ISP / Operator navigates to the NOC login, they enter only their registered mobile number.</p>
+                  <p>2. <strong>Automated Verification Dispatch:</strong> The VRV ACS backend verifies authorization, cryptographically salts and hashes a 6-digit OTP, and dispatches it through this connected WhatsApp account.</p>
+                  <p>3. <strong>Zero Paid Third-Party Gateways:</strong> Delivered directly via Baileys multi-device engine without Twilio or Meta WhatsApp Business API charges.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       ONBOARD / EDIT OPERATOR (FULL MANDATORY KYC MODAL)
+       ========================================================= -->
+  <div class="sa-modal-backdrop" id="modalOperatorKyc" style="display: none;">
+    <div class="sa-modal-box" style="max-width: 780px;">
+      <div class="sa-modal-header">
+        <h3 class="sa-modal-title" id="modalOperatorTitle">➕ Onboard New Operator (Full KYC)</h3>
+        <button class="sa-btn-icon-tiny" onclick="closeOperatorModal()">✕</button>
+      </div>
+
+      <div class="sa-modal-body">
+        <form id="formOperatorKyc" onsubmit="event.preventDefault(); saveOperatorKyc();">
+          <input type="hidden" id="opEditId">
+
+          <div class="kyc-section-header">🏢 1. OPERATOR BUSINESS & PORTAL CREDENTIALS</div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Operator / ISP Company Name *</label>
+              <input type="text" id="opName" class="form-control" placeholder="" oninput="onOpNameInput()" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">URL Slug / Subdomain (Fixed) *</label>
+              <input type="text" id="opSlug" class="form-control mono" placeholder="" oninput="onOpSlugInput()" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.2);padding:0.6rem 0.85rem;border-radius:6px;margin-bottom:1rem;">
+            <div style="font-size:0.75rem;color:#94a3b8;font-weight:600;">Assigned Carrier CWMP Listening URL (No port needed):</div>
+            <div id="opCwmpUrlPreview" class="mono font-bold" style="color:#38bdf8;font-size:0.85rem;margin-top:0.2rem;">http://ciniplay.in/</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Custom Logo Image URL (Optional)</label>
+            <input type="text" id="opLogoUrl" class="form-control mono" placeholder="">
+          </div>
+
+          <div class="kyc-section-header">👤 2. OWNER & MANDATORY KYC DOCUMENTS</div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Proprietor / Contact Person Name *</label>
+              <input type="text" id="opContactPerson" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Primary Mobile Phone Number (Login ID) *</label>
+              <input type="tel" id="opPhone" class="form-control mono" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Billing Support Email *</label>
+              <input type="email" id="opEmail" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Aadhaar Card Number * (12 Digits)</label>
+              <input type="text" id="opAadhaar" class="form-control mono" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">PAN Number (Optional)</label>
+              <input type="text" id="opPan" class="form-control mono" placeholder="">
+            </div>
+            <div class="form-group">
+              <label class="form-label">GSTIN Number (Optional)</label>
+              <input type="text" id="opGstin" class="form-control mono" placeholder="">
+            </div>
+          </div>
+
+          <!-- AADHAAR / ID PROOF UPLOAD WIDGET -->
+          <div class="form-group" style="background:rgba(59,130,246,0.06);padding:1rem;border-radius:6px;border:1px dashed #3b82f6;">
+            <label class="form-label" style="color:#38bdf8;font-weight:700;">📄 Upload Government ID Proof (Aadhaar / Passport / License)</label>
+            <input type="file" id="opAadhaarFileInput" class="form-control" accept="image/*,.pdf" onchange="handleAadhaarFileChange(event)">
+            <input type="hidden" id="opAadhaarDocUrl">
+            <div id="aadhaarPreviewBadge" style="display:none;margin-top:0.4rem;font-size:0.75rem;color:#10b981;font-weight:600;">✓ Document Ready for Storage</div>
+          </div>
+
+          <div class="kyc-section-header">📍 3. MANDATORY BUSINESS ADDRESS (For GST Tax Invoices)</div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Door / Flat / Plot No *</label>
+              <input type="text" id="opAddrDoor" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Street / Landmark *</label>
+              <input type="text" id="opAddrStreet" class="form-control" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Area / Village *</label>
+              <input type="text" id="opAddrArea" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mandal / Tehsil *</label>
+              <input type="text" id="opAddrMandal" class="form-control" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">District *</label>
+              <input type="text" id="opAddrDistrict" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">State *</label>
+              <input type="text" id="opAddrState" class="form-control" placeholder="" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pincode *</label>
+              <input type="text" id="opAddrPincode" class="form-control mono" placeholder="" required>
+            </div>
+          </div>
+
+          <div class="kyc-section-header">💳 4. SAAS PRICING & HARDWARE LIMITS</div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label class="form-label">Assigned SaaS Tier</label>
+              <select id="opPlanId" class="form-control" onchange="onPlanSelectChange()">
+                <option value="plan_starter">Starter (Up to 250 ONTs) — ₹1,499/mo</option>
+                <option value="plan_growth" selected>Growth (Up to 600 ONTs) — ₹2,999/mo</option>
+                <option value="plan_enterprise">Enterprise (Up to 1,500 ONTs) — ₹5,999/mo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max ONT Limit</label>
+              <input type="number" id="opMaxOnts" class="form-control mono" value="600" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Monthly Charge (₹)</label>
+              <input type="number" id="opMonthlyFee" class="form-control mono" value="2999" required>
+            </div>
+          </div>
+
+          <div style="text-align: right; margin-top: 1.5rem;">
+            <button type="button" class="btn-sa-secondary" onclick="closeOperatorModal()" style="margin-right: 0.5rem;">Cancel</button>
+            <button type="submit" class="btn-sa-primary">💾 Save Operator KYC & Provision</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       GENERATE B2B TAX INVOICE MODAL
+       ========================================================= -->
+  <div class="sa-modal-backdrop" id="modalGenerateInvoice" style="display: none;">
+    <div class="sa-modal-box" style="max-width: 580px;">
+      <div class="sa-modal-header">
+        <h3 class="sa-modal-title">🧾 Issue B2B GST Tax Invoice</h3>
+        <button class="sa-btn-icon-tiny" onclick="closeGenerateInvoiceModal()">✕</button>
+      </div>
+      <div class="sa-modal-body">
+        <form id="formGenerateInvoice">
+          <div class="form-group">
+            <label class="form-label">Select Billed Operator / Tenant:</label>
+            <select id="invTenantSelect" class="form-control" required></select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Monthly Base Charge (Subtotal in ₹):</label>
+            <input type="number" id="invSubtotalAmount" class="form-control mono" value="2999" required>
+            <span style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;display:block;">CGST 9% (₹269.91) + SGST 9% (₹269.91) will be calculated automatically</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Invoice Line Item Description:</label>
+            <input type="text" id="invBillingDesc" class="form-control" value="VRV ACS Cloud TR-069 Subscription (Growth Tier - 600 ONTs)" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Initial Invoice Status:</label>
+            <select id="invStatusSelect" class="form-control">
+              <option value="PENDING" selected>PENDING (Payment Awaited via UPI/NEFT)</option>
+              <option value="PAID">PAID (Settled)</option>
+            </select>
+          </div>
+
+          <div style="text-align: right; margin-top: 1.5rem;">
+            <button type="button" class="btn-sa-secondary" onclick="closeGenerateInvoiceModal()" style="margin-right:0.5rem;">Cancel</button>
+            <button type="submit" class="btn-sa-primary">🧾 Generate & Render Formal Invoice</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       PRINTABLE A4 FORMAL B2B TAX INVOICE MODAL
+       ========================================================= -->
+  <div class="sa-modal-backdrop" id="modalViewInvoice" style="display: none; z-index: 9999;">
+    <div class="sa-modal-box" style="max-width: 860px; max-height: 92vh; overflow-y: auto; background: #ffffff; color: #0f172a; padding: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #fff; padding: 0.85rem 1.5rem;">
+        <span style="font-weight: 700; font-size: 0.95rem;">🧾 Official Carrier-Grade B2B GST Tax Invoice</span>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn-sa-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;" onclick="window.print()">🖨️ Print / PDF</button>
+          <button class="sa-btn-icon-tiny" style="color: #fff;" onclick="closeViewInvoiceModal()">✕</button>
+        </div>
+      </div>
+
+      <!-- PRINTABLE A4 INVOICE SHEET -->
+      <div class="printable-invoice" id="printableInvoiceDocument">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SUPER ADMIN SIGN IN MODAL (2-STEP EMAIL OTP VERIFIED)
+       ========================================================= -->
+  <div class="sa-modal-backdrop" id="modalSaLogin" style="display:flex;z-index:99999;">
+    <div class="sa-modal-box" style="max-width:440px;padding:2.25rem;">
+      <div style="text-align:center;margin-bottom:1.5rem;">
+        <img src="/images/vrv-acs-emblem.png" alt="VRV ACS" style="width:72px;height:72px;border-radius:50%;margin:0 auto 1rem auto;box-shadow:0 0 25px rgba(59,130,246,0.45);display:block;">
+        <h2 style="font-size:1.3rem;font-weight:800;color:#ffffff;">VRV ACS SaaS Platform</h2>
+        <div style="font-size:0.8rem;color:#94a3b8;margin-top:0.25rem;">Authorized Super Admin Email Sign In</div>
+      </div>
+      <div class="sa-modal-body" style="padding:0;">
+        <div id="saLoginAlert" style="display:none;background:rgba(239,68,68,0.15);border:1px solid #ef4444;color:#fca5a5;padding:0.6rem;border-radius:4px;font-size:0.8rem;margin-bottom:1rem;"></div>
+        <div id="saLoginSuccess" style="display:none;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#6ee7b7;padding:0.6rem;border-radius:4px;font-size:0.8rem;margin-bottom:1rem;"></div>
+
+        <!-- STEP 1: AUTHORIZED EMAIL ONLY (NO PASSWORD) -->
+        <form id="formSuperAdminLogin">
+          <div id="stepSaCredentials">
+            <div class="form-group">
+              <label class="form-label">Authorized Super Admin Email</label>
+              <input type="email" id="saLoginEmail" class="form-control mono" placeholder="" value="" required autocomplete="email" autofocus>
+            </div>
+            <button type="submit" id="btnSaSubmitStep1" class="btn-sa-primary" style="width:100%;margin-top:1rem;padding:0.75rem;font-size:0.95rem;justify-content:center;">
+              📧 Send 6-Digit Login Code
+            </button>
+          </div>
+        </form>
+
+        <!-- STEP 2: EMAIL OTP VERIFICATION -->
+        <form id="formSuperAdminOtp" style="display:none;">
+          <input type="hidden" id="saChallengeToken">
+          <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:6px;padding:0.75rem;margin-bottom:1rem;text-align:center;">
+            <div style="font-size:0.75rem;color:#94a3b8;">OTP Sent to Authorized Email:</div>
+            <div style="font-weight:700;color:#38bdf8;font-size:0.9rem;margin-top:0.25rem;" id="saTargetEmailDisplay"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="text-align:center;display:block;">Enter 6-Digit Email Verification Code</label>
+            <input type="text" id="saLoginOtp" class="form-control mono" maxlength="6" placeholder="123456" style="text-align:center;font-size:1.5rem;letter-spacing:6px;font-weight:800;" required autocomplete="one-time-code">
+          </div>
+          <button type="submit" id="btnSaSubmitStep2" class="btn-sa-primary" style="width:100%;margin-top:1rem;padding:0.75rem;font-size:0.95rem;justify-content:center;">
+            🔓 Verify OTP & Unlock Command Center
+          </button>
+          <div style="text-align:center;margin-top:0.75rem;">
+            <a href="javascript:void(0)" onclick="resetSaLoginForm()" style="font-size:0.75rem;color:#94a3b8;text-decoration:none;">← Change Email Address</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Master Logic -->
+  <script src="/superadmin/app.js?v=9.0.0"></script>
+</body>
+</html>

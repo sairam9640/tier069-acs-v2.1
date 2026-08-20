@@ -1,0 +1,17 @@
+[Unit]
+Description=Antigravity Full-End Custom TR-069 ACS Server and ISP Management Portal
+After=network.target mongod.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tr069-acs
+ExecStart=/usr/bin/node /opt/tr069-acs/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

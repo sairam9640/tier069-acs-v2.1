@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VRV ACS | Subscriber Fiber Self-Care App</title>
+  <meta name="theme-color" content="#090d16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VRV Fiber App">
+  <link rel="manifest" href="/customer/manifest.json">
+  <link rel="icon" type="image/png" href="/customer/icon-192.png">
+  <link rel="apple-touch-icon" href="/customer/icon-192.png">
+  <meta name="description" content="Manage your home fiber router, change WiFi passwords, monitor optical signal, and run speed tests with VRV ACS.">
+  <link rel="stylesheet" href="/customer/style.css?v=1.1.0">
+</head>
+<body>
+
+  <!-- 1. CUSTOMER LOGIN SCREEN -->
+  <div class="cust-login-overlay" id="custLoginScreen">
+    <div class="cust-login-card">
+      <div class="cust-brand-header">
+        <img src="/images/vrv-acs-emblem.png" alt="VRV ACS" style="width:72px;height:72px;border-radius:50%;margin:0 auto 0.75rem auto;box-shadow:0 0 20px rgba(60,80,224,0.4);display:block;">
+        <h1>VRV ACS SELF-CARE</h1>
+        <p>Fiber Broadband & Smart WiFi Control</p>
+      </div>
+
+      <form id="custLoginForm" class="cust-form">
+        <div class="cust-alert" id="custLoginAlert" style="display: none;"></div>
+
+        <div class="cust-input-group">
+          <label>PPPoE Username / Account ID</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="text" id="custLoginId" class="cust-input" placeholder="Enter PPPoE Username" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="cust-input-group">
+          <label>Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="custLoginPass" class="cust-input" placeholder="••••••••" autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-cust-primary" id="btnCustSubmit" style="margin-top:0.8rem;">
+          <span>🚀 Sign In to My Router</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. MAIN APP SHELL -->
+  <div class="cust-app-shell" id="custAppShell" style="display: none;">
+
+    <!-- Top App Bar -->
+    <header class="cust-topbar">
+      <div class="cust-top-brand">
+        <div class="cust-top-icon">📡</div>
+        <div>
+          <h2 id="appCustName">Loading...</h2>
+          <span class="cust-sub-status" id="appCustAccount">Account: --</span>
+        </div>
+      </div>
+
+      <div class="cust-top-actions">
+        <button class="btn-cust-action-pwa" id="btnPwaInstall" onclick="installPwaApp()" title="Install on Mobile">📲 Install</button>
+        <span class="cust-badge online" id="appRouterStatusBadge">Online</span>
+        <button class="btn-cust-icon" id="btnCustLogout" title="Sign Out">🚪</button>
+      </div>
+    </header>
+
+    <!-- Main Views Container -->
+    <main class="cust-main-content">
+
+      <!-- TAB 1: HOME DASHBOARD -->
+      <section class="cust-tab-view active" id="tab-home">
+        <!-- Optical Signal Hero Card -->
+        <div class="optical-hero-card">
+          <div class="optical-header">
+            <div>
+              <span class="optical-tag">⚡ Optical Fiber Health</span>
+              <h3 id="optSignalTitle">Checking Fiber Light...</h3>
+            </div>
+            <div class="optical-score-badge" id="optScoreBadge">98%</div>
+          </div>
+
+          <!-- Signal Meter Progress Bar -->
+          <div class="optical-meter-bar">
+            <div class="optical-meter-fill" id="optMeterFill" style="width: 95%;"></div>
+          </div>
+
+          <div class="optical-stats-grid">
+            <div class="opt-stat-item">
+              <span class="opt-stat-lbl">RX Power (Received)</span>
+              <strong class="opt-stat-val" id="optRxVal">-15.00 dBm</strong>
+            </div>
+            <div class="opt-stat-item">
+              <span class="opt-stat-lbl">TX Power (Transmitted)</span>
+              <strong class="opt-stat-val" id="optTxVal">+2.00 dBm</strong>
+            </div>
+            <div class="opt-stat-item">
+              <span class="opt-stat-lbl">Router Temp</span>
+              <strong class="opt-stat-val" id="optTempVal">48 °C</strong>
+            </div>
+            <div class="opt-stat-item">
+              <span class="opt-stat-lbl">Laser Voltage</span>
+              <strong class="opt-stat-val" id="optVoltVal">3.3 V</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Action Buttons -->
+        <div class="quick-actions-grid">
+          <button class="quick-action-card" onclick="switchCustTab('wifi')">
+            <div class="qa-icon" style="background: rgba(59, 130, 246, 0.2); color: #38bdf8;">📶</div>
+            <strong>WiFi Password</strong>
+            <span>View & Update</span>
+          </button>
+          <button class="quick-action-card" onclick="rebootCustomerRouter()">
+            <div class="qa-icon" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">🔄</div>
+            <strong>Restart Router</strong>
+            <span>Quick 1-Click Reboot</span>
+          </button>
+          <button class="quick-action-card" onclick="switchCustTab('devices')">
+            <div class="qa-icon" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">📱</div>
+            <strong>Connected Devices</strong>
+            <span id="qaDeviceCount">3 Devices</span>
+          </button>
+          <button class="quick-action-card" onclick="switchCustTab('speed')">
+            <div class="qa-icon" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">🚀</div>
+            <strong>Speed Test</strong>
+            <span>Check Latency</span>
+          </button>
+        </div>
+
+        <!-- Router Info Card -->
+        <div class="cust-info-card">
+          <h4 style="margin-bottom:0.75rem;">📡 Router & Connection Info</h4>
+          <div class="info-row">
+            <span>ONT Model:</span>
+            <strong id="infoModelName">--</strong>
+          </div>
+          <div class="info-row">
+            <span>PPPoE User:</span>
+            <strong id="infoPppUser" class="mono">--</strong>
+          </div>
+          <div class="info-row">
+            <span>WAN IP Address:</span>
+            <strong id="infoIpAddress" class="mono">--</strong>
+          </div>
+          <div class="info-row">
+            <span>Serial Number / MAC:</span>
+            <strong id="infoSerialMac" class="mono">--</strong>
+          </div>
+          <div class="info-row">
+            <span>Uptime:</span>
+            <strong id="infoUptime">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: WIFI CONTROL -->
+      <section class="cust-tab-view" id="tab-wifi">
+        <div class="section-title">
+          <h3>📶 Home WiFi Control Center</h3>
+          <p>Customize your WiFi name and password. Changes apply directly to your router.</p>
+        </div>
+
+        <!-- 2.4 GHz WiFi Card -->
+        <div class="wifi-band-card">
+          <div class="wifi-card-header">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="band-tag">2.4 GHz</span>
+              <h4 style="margin:0;">Standard WiFi</h4>
+            </div>
+            <span class="status-badge online" id="badgeWifi24">Active</span>
+          </div>
+
+          <form id="formCustWifi24" class="cust-form">
+            <div class="cust-input-group">
+              <label>WiFi Network Name (SSID):</label>
+              <input type="text" id="wifi24Ssid" class="cust-input" required>
+            </div>
+
+            <div class="cust-input-group">
+              <label>WiFi Password (Key):</label>
+              <div class="input-wrapper">
+                <input type="password" id="wifi24Pass" class="cust-input mono" placeholder="Min 8 characters" required>
+                <button type="button" class="btn-toggle-eye" onclick="togglePassVisibility('wifi24Pass', this)">👁️</button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-cust-primary" id="btnSaveWifi24">
+              <span>💾 Save 2.4G WiFi Changes</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- 5 GHz WiFi Card -->
+        <div class="wifi-band-card" style="margin-top:1.25rem;">
+          <div class="wifi-card-header">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span class="band-tag" style="background:rgba(168,85,247,0.2);color:#c084fc;">5 GHz</span>
+              <h4 style="margin:0;">High-Speed Ultra WiFi</h4>
+            </div>
+            <span class="status-badge online" id="badgeWifi5">Dual-Band</span>
+          </div>
+
+          <form id="formCustWifi5" class="cust-form">
+            <div class="cust-input-group">
+              <label>5G WiFi Network Name (SSID):</label>
+              <input type="text" id="wifi5Ssid" class="cust-input" required>
+            </div>
+
+            <div class="cust-input-group">
+              <label>5G WiFi Password (Key):</label>
+              <div class="input-wrapper">
+                <input type="password" id="wifi5Pass" class="cust-input mono" placeholder="Min 8 characters" required>
+                <button type="button" class="btn-toggle-eye" onclick="togglePassVisibility('wifi5Pass', this)">👁️</button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-cust-primary" style="background:#8b5cf6;" id="btnSaveWifi5">
+              <span>💾 Save 5G WiFi Changes</span>
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 3: CONNECTED DEVICES -->
+      <section class="cust-tab-view" id="tab-devices">
+        <div class="section-title">
+          <h3>📱 Connected Home Devices</h3>
+          <p>See all smartphones, smart TVs, and computers connected to your home network.</p>
+        </div>
+
+        <div class="devices-list-container" id="custConnectedDevicesList">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+
+      <!-- TAB 4: SPEED TEST -->
+      <section class="cust-tab-view" id="tab-speed">
+        <div class="section-title">
+          <h3>🚀 Live Speed & Latency Test</h3>
+          <p>Test real-time upload, download, and ping to the nearest ISP gateway.</p>
+        </div>
+
+        <div class="speedtest-card">
+          <div class="speed-dial">
+            <div class="speed-number" id="speedNumDisplay">0.0</div>
+            <span class="speed-unit">Mbps</span>
+            <span class="speed-state-lbl" id="speedStateLbl">Ready to Test</span>
+          </div>
+
+          <div class="speed-metrics-row">
+            <div class="metric-box">
+              <span>Download</span>
+              <strong id="speedDownVal">--</strong>
+            </div>
+            <div class="metric-box">
+              <span>Upload</span>
+              <strong id="speedUpVal">--</strong>
+            </div>
+            <div class="metric-box">
+              <span>Ping (Latency)</span>
+              <strong id="speedPingVal">--</strong>
+            </div>
+          </div>
+
+          <button class="btn-cust-primary" id="btnStartSpeedtest" onclick="runSpeedtest()">
+            <span>⚡ Start Broadband Speed Test</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB 5: ONLINE RECHARGE & BILLING -->
+      <section class="cust-tab-view" id="tab-recharge">
+        <div class="section-title">
+          <h3>💳 Online Broadband Recharge</h3>
+          <p>Instantly recharge or upgrade your high-speed internet plan with UPI, QR Code, or Net Banking.</p>
+        </div>
+
+        <div class="recharge-container">
+          <!-- Current Plan Status Card -->
+          <div class="plan-status-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <span class="band-tag" style="background:rgba(56,189,248,0.2);color:#38bdf8;">Current Active Plan</span>
+                <h3 style="margin:0.5rem 0 0.25rem 0;" id="custCurrentPlanName">100 Mbps Unlimited Fiber</h3>
+                <p style="color:#94a3b8;font-size:0.85rem;margin:0;">High-Speed Optical Broadband</p>
+              </div>
+              <div style="text-align:right;">
+                <span class="status-badge online" id="custPlanExpiryBadge">Active (18 Days Left)</span>
+                <div style="font-size:1.4rem;font-weight:800;color:#38bdf8;margin-top:0.25rem;">₹699<span style="font-size:0.75rem;color:#94a3b8;">/mo</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Select Renewal Plan -->
+          <h4 style="margin:1.5rem 0 0.75rem 0;">⚡ Choose Recharge / Upgrade Plan:</h4>
+          <div class="plans-grid" id="custPlansGrid">
+            <!-- Plan 1 -->
+            <div class="plan-choice-card" onclick="selectRechargePlan(this, '50 Mbps Super Saver', 499, 30, '50 Mbps')">
+              <div class="plan-header">
+                <strong>50 Mbps Saver</strong>
+                <span class="plan-price">₹499</span>
+              </div>
+              <p class="plan-desc">Unlimited High Speed Data | 30 Days Validity</p>
+              <div class="plan-badge">Standard Speed</div>
+            </div>
+
+            <!-- Plan 2 (Popular) -->
+            <div class="plan-choice-card selected" onclick="selectRechargePlan(this, '100 Mbps Ultra Fast', 699, 30, '100 Mbps')">
+              <div class="popular-ribbon">POPULAR</div>
+              <div class="plan-header">
+                <strong>100 Mbps Ultra</strong>
+                <span class="plan-price">₹699</span>
+              </div>
+              <p class="plan-desc">4K Ultra HD Streaming & Low-Ping Gaming | 30 Days</p>
+              <div class="plan-badge" style="background:#38bdf8;color:#0b0f19;">Best Value</div>
+            </div>
+
+            <!-- Plan 3 -->
+            <div class="plan-choice-card" onclick="selectRechargePlan(this, '200 Mbps Turbo Stream', 999, 30, '200 Mbps')">
+              <div class="plan-header">
+                <strong>200 Mbps Turbo</strong>
+                <span class="plan-price">₹999</span>
+              </div>
+              <p class="plan-desc">Multi-Device Heavy Work & 8K Streaming | 30 Days</p>
+              <div class="plan-badge">Superfast</div>
+            </div>
+
+            <!-- Plan 4 -->
+            <div class="plan-choice-card" onclick="selectRechargePlan(this, '300 Mbps Giga Max + OTT', 1299, 30, '300 Mbps')">
+              <div class="plan-header">
+                <strong>300 Mbps Giga + OTT</strong>
+                <span class="plan-price">₹1,299</span>
+              </div>
+              <p class="plan-desc">Extreme Giga Speed + Hotstar, Zee5, SonyLIV | 30 Days</p>
+              <div class="plan-badge" style="background:#f59e0b;color:#0b0f19;">VIP OTT Pack</div>
+            </div>
+          </div>
+
+          <!-- Payment Action Card -->
+          <div class="payment-checkout-card" id="rechargeCheckoutBox">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+              <div>
+                <span style="font-size:0.8rem;color:#94a3b8;">Selected Plan:</span>
+                <div style="font-weight:700;color:#fff;" id="checkoutPlanTitle">100 Mbps Ultra Fast</div>
+              </div>
+              <div style="text-align:right;">
+                <span style="font-size:0.8rem;color:#94a3b8;">Payable Amount:</span>
+                <div style="font-size:1.3rem;font-weight:800;color:#10b981;" id="checkoutAmount">₹699</div>
+              </div>
+            </div>
+
+            <!-- UPI QR Code / Instant Pay Button -->
+            <div class="upi-pay-box">
+              <div class="qr-container" style="text-align:center;margin-bottom:1rem;">
+                <img id="upiDynamicQr" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=ciniplay@oksbi&pn=Broadband%20Recharge&am=699&cu=INR" alt="UPI QR Code" style="border-radius:8px;border:3px solid #38bdf8;padding:4px;background:#fff;">
+                <p style="font-size:0.75rem;color:#94a3b8;margin-top:0.5rem;">Scan with Google Pay, PhonePe, Paytm or BHIM</p>
+              </div>
+
+              <button class="btn-cust-primary" style="background:#10b981;" id="btnInstantRecharge" onclick="processOnlineRecharge()">
+                <span>⚡ Complete Instant Recharge (UPI / Card)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: SUPPORT & HELP -->
+      <section class="cust-tab-view" id="tab-support">
+        <div class="section-title">
+          <h3>🎫 Support & Help Desk</h3>
+          <p>Raise a ticket with our technical team if you experience internet issues or red LOS light.</p>
+        </div>
+
+        <div class="support-card">
+          <form id="formCustComplaint" class="cust-form">
+            <div class="cust-input-group">
+              <label>Issue Category:</label>
+              <select id="compCategory" class="cust-input">
+                <option value="Slow Internet Speed">Slow Internet / High Latency</option>
+                <option value="Red LOS Light / Fiber Cut">Red LOS Light (No Fiber Light)</option>
+                <option value="Frequent Disconnections">Frequent Disconnections</option>
+                <option value="WiFi Range / Weak Coverage">WiFi Range / Weak Coverage</option>
+                <option value="Router Relocation Request">Router Relocation Request</option>
+                <option value="Billing & Plan Query">Billing & Plan Query</option>
+              </select>
+            </div>
+
+            <div class="cust-input-group">
+              <label>Describe the Problem:</label>
+              <textarea id="compDescription" class="cust-input" rows="3" placeholder="Explain the problem you are facing..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-cust-primary" id="btnSubmitComplaint">
+              <span>📩 Submit Support Ticket</span>
+            </button>
+          </form>
+        </div>
+
+        <div style="margin-top:1.5rem;">
+          <h4 style="margin-bottom:0.75rem;">📋 Your Support Tickets</h4>
+          <div id="custTicketsList">
+            <div class="ticket-item">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong>Ticket #TKT-841920</strong>
+                <span class="status-badge online">Resolved</span>
+              </div>
+              <p style="font-size:0.8rem;color:#94a3b8;margin-top:0.25rem;">Optical power calibration on JC-01 splitter port.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Mobile Navigation Bar -->
+    <nav class="cust-bottom-nav">
+      <button class="nav-item active" onclick="switchCustTab('home')">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-lbl">Home</span>
+      </button>
+      <button class="nav-item" onclick="switchCustTab('wifi')">
+        <span class="nav-icon">📶</span>
+        <span class="nav-lbl">WiFi</span>
+      </button>
+      <button class="nav-item" onclick="switchCustTab('recharge')">
+        <span class="nav-icon">💳</span>
+        <span class="nav-lbl">Recharge</span>
+      </button>
+      <button class="nav-item" onclick="switchCustTab('devices')">
+        <span class="nav-icon">📱</span>
+        <span class="nav-lbl">Devices</span>
+      </button>
+      <button class="nav-item" onclick="switchCustTab('speed')">
+        <span class="nav-icon">🚀</span>
+        <span class="nav-lbl">Speed</span>
+      </button>
+      <button class="nav-item" onclick="switchCustTab('support')">
+        <span class="nav-icon">🎫</span>
+        <span class="nav-lbl">Support</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="cust-toast" id="custToast" style="display: none;"></div>
+
+  <script src="/customer/app.js?v=1.0.0"></script>
+</body>
+</html>

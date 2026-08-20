@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables (sensitive keys)
+.env
+.env.local
+
+# Build & Logs
+logs/
+*.log
+npm-debug.log*
+
+# System & Editor files
+.DS_Store
+Thumbs.db
+*.metadata.json
+.system_generated/
+scratch/

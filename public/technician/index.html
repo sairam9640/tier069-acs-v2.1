@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VRV ACS | Field Technician Engineering Toolkit</title>
+  <meta name="theme-color" content="#060913">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/technician/style.css">
+</head>
+<body>
+
+  <!-- 1. TECHNICIAN LOGIN SCREEN -->
+  <div class="tech-login-overlay" id="techLoginOverlay" style="position:fixed;inset:0;background:#060913;z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.25rem;">
+    <div style="background:#0e1726;border:1px solid #1e293b;border-radius:12px;width:100%;max-width:400px;padding:2rem 1.5rem;box-shadow:0 20px 30px rgba(0,0,0,0.7);text-align:center;">
+      <img src="/images/vrv-acs-emblem.png" alt="VRV ACS" style="width:72px;height:72px;border-radius:50%;margin:0 auto 1rem auto;box-shadow:0 0 20px rgba(60,80,224,0.4);display:block;">
+      <h2 style="font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:0.25rem;">VRV ACS Field Toolkit</h2>
+      <p style="font-size:0.8rem;color:#94a3b8;margin-bottom:1.5rem;">Technician & Field Engineer Sign In</p>
+
+      <div id="techLoginAlert" style="display:none;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid #ef4444;border-radius:4px;padding:0.6rem;font-size:0.8rem;margin-bottom:1rem;text-align:center;"></div>
+
+      <form id="formTechLogin" onsubmit="event.preventDefault(); handleTechLogin();">
+        <div style="text-align:left;margin-bottom:1rem;">
+          <label style="font-size:0.75rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:0.35rem;">Technician Username</label>
+          <input type="text" id="techLoginUser" style="width:100%;background:#060a14;border:1px solid #1e293b;border-radius:6px;padding:0.65rem 0.85rem;color:#fff;font-size:0.85rem;outline:none;" placeholder="e.g. tech / sairam" required autocomplete="username">
+        </div>
+        <div style="text-align:left;margin-bottom:1.25rem;">
+          <label style="font-size:0.75rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:0.35rem;">Secret Password</label>
+          <input type="password" id="techLoginPass" style="width:100%;background:#060a14;border:1px solid #1e293b;border-radius:6px;padding:0.65rem 0.85rem;color:#fff;font-size:0.85rem;outline:none;" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" style="width:100%;background:#3c50e0;color:#fff;border:none;border-radius:6px;padding:0.75rem;font-weight:700;font-size:0.9rem;cursor:pointer;">
+          🔐 Sign In as Technician
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. MAIN TECHNICIAN TOOLKIT -->
+  <div class="tech-app" id="techMainApp" style="display: none;">
+    <!-- Top Header -->
+    <header class="tech-header">
+      <div class="tech-brand">
+        <img src="/images/vrv-acs-emblem.png" alt="VRV ACS" style="width:36px;height:36px;border-radius:50%;display:block;box-shadow:0 0 10px rgba(60,80,224,0.4);">
+        <div>
+          <h1 id="techAppTitle">VRV ACS Tech Tool</h1>
+          <span class="tech-status" id="techStatusBadge">🟢 Field Engineer Active</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn-refresh" onclick="loadTechData()">🔄</button>
+        <button class="btn-refresh" onclick="logoutTechnician()" title="Sign Out">🚪</button>
+      </div>
+    </header>
+
+    <!-- Incident / Fault Summary Banner -->
+    <div class="alert-banner" id="techAlertBanner">
+      <div class="alert-icon">⚡</div>
+      <div class="alert-content">
+        <strong id="techAlertTitle">1 Critical Optical Incident Detected</strong>
+        <span id="techAlertSub">High attenuation / Fiber drop near JC-03 (1.34 km from OLT)</span>
+      </div>
+    </div>
+
+    <!-- Quick Tool Tabs -->
+    <div class="tech-tabs">
+      <button class="tech-tab active" data-tab="tickets" onclick="switchTechTab('tickets')">📋 Active Tasks</button>
+      <button class="tech-tab" data-tab="faults" onclick="switchTechTab('faults')">✂️ Fiber Cuts</button>
+      <button class="tech-tab" data-tab="power" onclick="switchTechTab('power')">⚡ Optical Meter</button>
+    </div>
+
+    <!-- View: Active Tasks -->
+    <div class="tech-view active" id="view-tickets">
+      <div class="section-title">Field Service Tickets</div>
+      <div id="techTicketList" class="ticket-list">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <!-- View: Fiber Cuts -->
+    <div class="tech-view" id="view-faults">
+      <div class="section-title">OTDR Detected Cable Breaks</div>
+      <div id="techFaultsList" class="ticket-list">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <!-- View: Live Optical Meter -->
+    <div class="tech-view" id="view-power">
+      <div class="section-title">Splitter & SFP Power Tester</div>
+      <div class="meter-card">
+        <div class="meter-label">Live Optical Level at Customer Drop:</div>
+        <div class="meter-value" id="meterDisplay">-21.40 dBm</div>
+        <div class="meter-status text-success" id="meterStatus">🟢 Signal is Optimal (-15 to -24 dBm)</div>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+          <button class="btn-action-tech" onclick="testDropPower()">⚡ Read Live Laser Power</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/technician/app.js?v=2.0.0"></script>
+</body>
+</html>
