@@ -184,6 +184,15 @@
             </a>
           </li>
           <li>
+            <a class="sa-nav-item nav-tab" data-tab="otp-logs" onclick="switchSaasTab('otp-logs')">
+              <div class="sa-nav-item-left">
+                <span class="sa-nav-icon">🔐</span>
+                <span>OTP Dispatch Logs</span>
+              </div>
+              <span class="sa-badge-pill" style="background:#8b5cf6;color:#fff;" id="tabCountOtpLogs">0</span>
+            </a>
+          </li>
+          <li>
             <a class="sa-nav-item" data-tab="status">
               <div class="sa-nav-item-left">
                 <span class="sa-nav-icon">🔔</span>
@@ -1027,6 +1036,72 @@
                   <p>3. <strong>Zero Paid Third-Party Gateways:</strong> Delivered directly via Baileys multi-device engine without Twilio or Meta WhatsApp Business API charges.</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             SECTION: OTP DISPATCH & VERIFICATION AUDIT LOGS
+             ========================================================= -->
+        <section class="sa-tab-section saas-tab-view" id="view-otp-logs" style="display: none;">
+          <div class="sa-page-header">
+            <div>
+              <h1 class="sa-page-title">🔐 OTP Dispatch &amp; Verification Audit Logs</h1>
+              <p class="sa-page-subtitle">Real-time audit log of all 6-digit OTPs dispatched via Gmail SMTP &amp; Master WhatsApp Web with exact timestamps, target recipients, delivery channels, and verification statuses.</p>
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:center;">
+              <button class="sa-btn-primary" onclick="loadOtpLogs()">
+                🔄 Refresh OTP Logs
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI STATS -->
+          <div class="sa-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+            <div class="sa-stat-card">
+              <div class="sa-stat-label">Total OTPs Dispatched</div>
+              <div class="sa-stat-value" id="statTotalOtps" style="color:#38bdf8;">0</div>
+            </div>
+            <div class="sa-stat-card">
+              <div class="sa-stat-label">Verified Logins</div>
+              <div class="sa-stat-value" id="statVerifiedOtps" style="color:#10b981;">0</div>
+            </div>
+            <div class="sa-stat-card">
+              <div class="sa-stat-label">WhatsApp Channel</div>
+              <div class="sa-stat-value" id="statWaOtps" style="color:#22c55e;">0</div>
+            </div>
+            <div class="sa-stat-card">
+              <div class="sa-stat-label">Email SMTP Channel</div>
+              <div class="sa-stat-value" id="statEmailOtps" style="color:#a855f7;">0</div>
+            </div>
+          </div>
+
+          <!-- TABLE -->
+          <div class="sa-card-box">
+            <div class="sa-card-header">
+              <div class="sa-card-title">📜 Chronological OTP Dispatch &amp; Audit Stream</div>
+              <input type="text" id="otpLogsSearch" class="form-control mono" style="max-width:280px;font-size:0.78rem;" placeholder="Search by recipient, OTP, or type..." onkeyup="filterOtpLogsTable()">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="sa-table">
+                <thead>
+                  <tr>
+                    <th>TIME &amp; DATE</th>
+                    <th>TARGET RECIPIENT</th>
+                    <th>AUTH TYPE</th>
+                    <th>CHANNEL</th>
+                    <th>DISPATCHED OTP CODE</th>
+                    <th>CHALLENGE TOKEN</th>
+                    <th>STATUS</th>
+                    <th>CONSUMED AT</th>
+                  </tr>
+                </thead>
+                <tbody id="tblOtpLogsBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">Loading OTP dispatch history...</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>

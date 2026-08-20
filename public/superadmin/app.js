@@ -404,9 +404,9 @@ window.switchSaasTab = function(tabName, updateHash = true) {
   if (tabName === 'roles') loadRolesPermissions();
   if (tabName === 'audit') loadAuditLogs();
   if (tabName === 'settings') loadGlobalSettings();
-  if (tabName === 'status') loadSystemLiveStatus();
   if (tabName === 'olt-fleet') window.loadSuperAdminOlts();
   if (tabName === 'whatsapp-gateway') window.loadSaWaStatus();
+  if (tabName === 'otp-logs') window.loadOtpLogs();
   if (tabName === 'overview') {
     loadSuperAdminDashboard(true);
   }
@@ -501,6 +501,9 @@ async function loadSuperAdminDashboard(isBackground = false) {
       currentPlans = plansData.plans || [];
       renderPlans();
     }
+
+    // 6. Preload OTP logs count
+    window.loadOtpLogs().catch(() => {});
 
   } catch (err) {
     if (!isBackground) console.warn('Error loading dashboard:', err.message);
@@ -886,8 +889,8 @@ function renderOperatorsTable(operators) {
             <div class="mono" style="font-size:0.75rem;">Aadhaar: ${escapeHtml(op.aadhaarNo || 'Verified')}</div>
           </td>
           <td>
-            ${op.slug === 'rudra' ? `
-              <a href="http://ciniplay.in/" target="_blank" class="mono font-bold" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;">
+            ${(op.cwmpUrl === 'http://ciniplay.in/' || op.domain === 'ciniplay.in' || op.slug === 'r' || op.slug === 'rudra' || op.slug === 'default') ? `
+              <a href="http://ciniplay.in/" target="_blank" class="mono font-bold" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" title="Dedicated CWMP ACS & NOC Console">
                 http://ciniplay.in/ ↗
               </a>
             ` : `
@@ -1029,7 +1032,8 @@ window.onOpNameInput = function() {
 window.onOpSlugInput = function() {
   const slug = (document.getElementById('opSlug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
   const preview = document.getElementById('opCwmpUrlPreview');
-  const isFirst = (!currentOperators || currentOperators.length === 0) || slug === 'rudra';
+  const editId = document.getElementById('opEditId')?.value;
+  const isFirst = (!currentOperators || currentOperators.length === 0) || slug === 'rudra' || slug === 'r' || editId === 'tenant_r';
   if (preview) {
     if (isFirst || !slug) {
       preview.textContent = 'http://ciniplay.in/';
@@ -1087,7 +1091,7 @@ window.saveOperatorKyc = async function() {
   const phone = (document.getElementById('opPhone').value || '').trim();
   const cleanPhone = phone.replace(/[^0-9]/g, '');
   const slug = (document.getElementById('opSlug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  const isFirst = (!currentOperators || currentOperators.length === 0) || slug === 'rudra';
+  const isFirst = (!currentOperators || currentOperators.length <= 1) || slug === 'rudra' || slug === 'r' || editId === 'tenant_r';
   const domain = isFirst ? 'ciniplay.in' : `${slug}.ciniplay.in`;
   const cwmpUrl = `http://${domain}/`;
 
@@ -1999,3 +2003,111 @@ window.sendSaWaTestOtp = async function() {
     }
   }
 };
+
+// =========================================================================
+// 12. LIVE OTP DISPATCH & VERIFICATION AUDIT LOG STREAM
+// =========================================================================
+let allOtpLogs = [];
+
+window.loadOtpLogs = async function() {
+  const tbody = document.getElementById('tblOtpLogsBody');
+  if (tbody && allOtpLogs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#94a3b8;">Loading live OTP dispatch logs...</td></tr>`;
+  }
+
+  try {
+    const res = await saFetch('/api/superadmin/otp-logs');
+    const data = await res.json();
+    if (data.success) {
+      allOtpLogs = data.logs || [];
+      const badge = document.getElementById('tabCountOtpLogs');
+      if (badge) badge.textContent = allOtpLogs.length;
+
+      // Update Top KPIs
+      const statTotal = document.getElementById('statTotalOtps');
+      if (statTotal) statTotal.textContent = allOtpLogs.length;
+
+      const verified = allOtpLogs.filter(o => o.isUsed || o.status === 'VERIFIED').length;
+      const statVerified = document.getElementById('statVerifiedOtps');
+      if (statVerified) statVerified.textContent = verified;
+
+      const waCount = allOtpLogs.filter(o => o.channel.includes('WhatsApp')).length;
+      const statWa = document.getElementById('statWaOtps');
+      if (statWa) statWa.textContent = waCount;
+
+      const emailCount = allOtpLogs.filter(o => o.channel.includes('SMTP') || o.channel.includes('Email')).length;
+      const statEmail = document.getElementById('statEmailOtps');
+      if (statEmail) statEmail.textContent = emailCount;
+
+      renderOtpLogsTable(allOtpLogs);
+    }
+  } catch (err) {
+    console.error('Error loading OTP logs:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#ef4444;">Failed to load OTP logs: ${escapeHtml(err.message)}</td></tr>`;
+  }
+};
+
+window.filterOtpLogsTable = function() {
+  const q = (document.getElementById('otpLogsSearch')?.value || '').toLowerCase().trim();
+  if (!q) {
+    renderOtpLogsTable(allOtpLogs);
+    return;
+  }
+  const filtered = allOtpLogs.filter(o => {
+    const text = `${o.target} ${o.recipient} ${o.type} ${o.channel} ${o.otpCode} ${o.status}`.toLowerCase();
+    return text.includes(q);
+  });
+  renderOtpLogsTable(filtered);
+};
+
+function renderOtpLogsTable(logs) {
+  const tbody = document.getElementById('tblOtpLogsBody');
+  if (!tbody) return;
+
+  if (logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#94a3b8;">No OTP dispatch logs found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = logs.map(l => {
+    const isVerified = l.isUsed || l.status === 'VERIFIED';
+    const isExpired = l.status === 'EXPIRED';
+    const isWa = l.channel.includes('WhatsApp');
+    const createdStr = l.createdAt ? new Date(l.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '—';
+    const consumedStr = l.consumedAt ? new Date(l.consumedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : (isVerified ? 'Consumed' : '—');
+
+    return `
+      <tr>
+        <td style="font-size:0.78rem;color:#cbd5e1;" class="mono">${escapeHtml(createdStr)}</td>
+        <td>
+          <strong style="color:#ffffff;font-size:0.85rem;">${escapeHtml(l.target || l.recipient)}</strong>
+          ${l.tenantSlug ? `<div style="font-size:0.72rem;color:#64748b;" class="mono">slug: /${escapeHtml(l.tenantSlug)}</div>` : ''}
+        </td>
+        <td>
+          <span class="mono" style="font-size:0.75rem;color:${l.type.includes('SUPER') ? '#f59e0b' : '#38bdf8'};font-weight:700;">
+            ${l.type.includes('SUPER') ? '👑 SUPER ADMIN' : '🏢 OPERATOR NOC'}
+          </span>
+        </td>
+        <td>
+          <span style="font-size:0.75rem;display:inline-flex;align-items:center;gap:4px;color:${isWa ? '#22c55e' : '#a855f7'};font-weight:600;">
+            ${isWa ? '📱 WhatsApp Web' : '📧 Gmail SMTP'}
+          </span>
+        </td>
+        <td>
+          <span class="mono" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);padding:0.25rem 0.55rem;border-radius:6px;color:#f8fafc;font-weight:800;font-size:0.92rem;letter-spacing:2px;">
+            ${escapeHtml(l.otpCode || '******')}
+          </span>
+        </td>
+        <td class="mono" style="font-size:0.72rem;color:#64748b;" title="${escapeHtml(l.challengeToken || '')}">
+          ${escapeHtml((l.challengeToken || '').slice(0, 16))}...
+        </td>
+        <td>
+          <span class="sa-badge-active" style="background:${isVerified ? 'rgba(16,185,129,0.15)' : (isExpired ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)')};color:${isVerified ? '#10b981' : (isExpired ? '#ef4444' : '#f59e0b')};font-size:0.72rem;">
+            ${isVerified ? '✅ VERIFIED' : (isExpired ? '⌛ EXPIRED' : '🟡 ACTIVE PENDING')}
+          </span>
+        </td>
+        <td class="mono" style="font-size:0.75rem;color:#94a3b8;">${escapeHtml(consumedStr)}</td>
+      </tr>
+    `;
+  }).join('');
+}

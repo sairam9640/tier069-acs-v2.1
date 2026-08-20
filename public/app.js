@@ -301,6 +301,22 @@ window.doAdminLogin = async function(customPhone) {
   }
 };
 
+window.resetOpLoginForm = function() {
+  const formLogin = document.getElementById('formLogin');
+  const formOpOtp = document.getElementById('formOpOtp');
+  const loginAlert = document.getElementById('loginAlert');
+  const loginSuccess = document.getElementById('loginSuccess');
+  const opLoginOtp = document.getElementById('opLoginOtp');
+  
+  if (formLogin) formLogin.style.display = 'block';
+  if (formOpOtp) formOpOtp.style.display = 'none';
+  if (loginAlert) loginAlert.style.display = 'none';
+  if (loginSuccess) loginSuccess.style.display = 'none';
+  if (opLoginOtp) opLoginOtp.value = '';
+  const uInput = document.getElementById('loginUser');
+  if (uInput) uInput.focus();
+};
+
 window.doVerifyOpOtp = async function() {
   const challengeToken = document.getElementById('opChallengeToken').value;
   const otp = document.getElementById('opLoginOtp').value.trim();
