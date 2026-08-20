@@ -468,12 +468,12 @@
                 <span style="font-size:1.3rem;">🏢</span>
                 <div>
                   <div class="box-title" style="margin:0;">GPON / EPON OLT Uplink & Physical Headend Telemetry</div>
-                  <div style="font-size:0.75rem;color:var(--text-body);" id="dashOltSubtitle">Syrotech EPON Core Headend • Host: <strong class="mono" style="color:#38bdf8;">172.18.18.3:22</strong> (SSH Safe Read)</div>
+                  <div style="font-size:0.75rem;color:var(--text-body);" id="dashOltSubtitle">No physical OLT integrated • Click "Open OLT Manager" to link your hardware headend</div>
                 </div>
               </div>
               <div style="display:flex;gap:0.5rem;align-items:center;">
-                <span class="tailadmin-badge success" id="dashOltBadge" style="display:inline-flex;align-items:center;gap:0.4rem;">
-                  <span class="pulse-dot"></span> 🟢 OLT UPLINK ACTIVE
+                <span class="tailadmin-badge" id="dashOltBadge" style="display:inline-flex;align-items:center;gap:0.4rem;background:#334155;color:#94a3b8;">
+                  ⚪ NO OLT LINKED
                 </span>
                 <button class="btn-primary" style="padding:0.35rem 0.75rem;font-size:0.75rem;" onclick="switchTab('olt')">
                   🏢 Open OLT Manager
@@ -484,19 +484,19 @@
             <div class="tailadmin-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 0.5rem;">
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
                 <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">OLT CPU / Memory</div>
-                <div class="mono" style="font-size:1rem;color:#38bdf8;font-weight:700;margin-top:0.2rem;" id="dashOltCpuMem">12% / 34%</div>
+                <div class="mono" style="font-size:1rem;color:#38bdf8;font-weight:700;margin-top:0.2rem;" id="dashOltCpuMem">-- / --</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
                 <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">Core Temperature</div>
-                <div class="mono" style="font-size:1rem;color:#10b981;font-weight:700;margin-top:0.2rem;" id="dashOltTemp">41.8 °C</div>
+                <div class="mono" style="font-size:1rem;color:#10b981;font-weight:700;margin-top:0.2rem;" id="dashOltTemp">--</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
                 <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">Active PON Fleet</div>
-                <div class="mono" style="font-size:1rem;color:#a855f7;font-weight:700;margin-top:0.2rem;" id="dashOltOnusCount">5 ONUs (4 PONs)</div>
+                <div class="mono" style="font-size:1rem;color:#a855f7;font-weight:700;margin-top:0.2rem;" id="dashOltOnusCount">0 ONUs (0 PONs)</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;">
                 <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;">TR-069 + OLT Sync</div>
-                <div class="mono" style="font-size:1rem;color:#10b981;font-weight:700;margin-top:0.2rem;" id="dashOltSyncStatus">🟢 100% Synced</div>
+                <div class="mono" style="font-size:1rem;color:#94a3b8;font-weight:700;margin-top:0.2rem;" id="dashOltSyncStatus">⚪ No OLT Linked</div>
               </div>
             </div>
           </div>
@@ -853,7 +853,6 @@
               </select>
               <select id="opticalOltFilter" class="ont-select-control" onchange="filterOpticalTable()">
                 <option value="ALL">All OLTs</option>
-                <option value="SyroTech OLT-01">SyroTech OLT-01 (172.18.18.3)</option>
               </select>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -2112,8 +2111,7 @@
             <div class="form-group">
               <label class="form-label">Assigned OLT Device:</label>
               <select id="newOltSelect" class="form-control">
-                <option value="SyroTech OLT-01">SyroTech OLT-01 (172.18.18.3)</option>
-                <option value="SyroTech OLT-02">SyroTech OLT-02 (Backup)</option>
+                <option value="">-- Select OLT Device --</option>
               </select>
             </div>
             <div class="form-group">
@@ -2473,7 +2471,7 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label class="form-label">Management IP / Host *</label>
-                <input type="text" id="oltHost" class="form-control mono" placeholder="172.18.18.3" value="172.18.18.3" required>
+                <input type="text" id="oltHost" class="form-control mono" placeholder="e.g. 192.168.1.100" value="" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Port (SSH 22 / Telnet 23) *</label>
@@ -2641,7 +2639,7 @@
       <div class="modal-header">
         <div>
           <div style="font-size: 0.75rem; color: #38bdf8; font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;" id="inspBreadcrumb">
-            SYROTECH EPON OLT HEADEND • 172.18.18.3
+            OLT HEADEND TELEMETRY
           </div>
           <h3 class="modal-title" id="inspOnuTitle">🔍 ONU Hardware Profile & Telemetry</h3>
           <div style="font-size: 0.8rem; color: var(--text-body);" id="inspOnuSubtitle">Physical Port Configuration & Live Optical Signal</div>
@@ -2653,11 +2651,11 @@
         <!-- 1. Top Card: Customer & MAC Overview -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
           <div>
-            <div style="font-size:1.1rem;font-weight:800;color:#ffffff;" id="inspCustName">RAJU (Subscriber)</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#ffffff;" id="inspCustName">--</div>
             <div class="mono" style="font-size:0.8rem;color:#38bdf8;margin-top:0.2rem;">
-              MAC: <strong id="inspOnuMac">A8:E2:07:77:1B:C9</strong> • Port: <strong id="inspPonPort">EPON 0/2</strong> • ONU ID: <strong id="inspOnuId">#1</strong>
+              MAC: <strong id="inspOnuMac">--</strong> • Port: <strong id="inspPonPort">--</strong> • ONU ID: <strong id="inspOnuId">--</strong>
             </div>
-            <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;" id="inspPhoneAccount">Account: 9951716316 • Phone: 9951716316</div>
+            <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.25rem;" id="inspPhoneAccount">Account: -- • Phone: --</div>
           </div>
           <div style="text-align:right;">
             <span class="tailadmin-badge success" id="inspOltStatusBadge">🟢 ONLINE (OLT)</span>

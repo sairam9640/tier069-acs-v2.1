@@ -914,8 +914,8 @@ function renderDevicesTable(devices) {
     const isOnline = isDeviceOnline(d);
 
     // 1. OLT DEVICE
-    const oltName = d.oltName || 'SyroTech OLT-01';
-    const oltIp = d.oltIp || '172.18.18.3';
+    const oltName = d.oltName || d.olt || '--';
+    const oltIp = d.oltIp || d.oltHost || '--';
 
     // 2. PON PORT
     let ponNum = '1/1';
@@ -4731,7 +4731,7 @@ window.loadOltManagementView = async function() {
     if (elName) elName.textContent = hasOlt ? (mainOlt.name || 'Core OLT Headend') : 'No Headend OLT Connected';
     const elMeta = document.getElementById('oltHeadendMeta');
     if (elMeta) elMeta.textContent = hasOlt 
-      ? `Host: ${mainOlt.host || '172.18.18.3'}:${mainOlt.port || 22} (${(mainOlt.protocol || 'SSH').toUpperCase()} Safe Read) • ${isOnline ? 'Authenticated' : 'Credentials Needed'}`
+      ? `Host: ${mainOlt.host || '--'}:${mainOlt.port || 22} (${(mainOlt.protocol || 'SSH').toUpperCase()} Safe Read) • ${isOnline ? 'Authenticated' : 'Credentials Needed'}`
       : 'No physical OLT integrated yet. Click "➕ Integrate New OLT" to link your hardware headend.';
     
     const elCpuMem = document.getElementById('oltCpuMemDisplay');
@@ -4776,6 +4776,32 @@ window.loadOltManagementView = async function() {
     }
 
     // 2. Update Overview Dashboard Widgets
+    const dashSub = document.getElementById('dashOltSubtitle');
+    const dashBadge = document.getElementById('dashOltBadge');
+    if (dashSub) {
+      dashSub.innerHTML = hasOlt
+        ? `${escapeHtml(mainOlt.name || 'Core OLT Headend')} • Host: <strong class="mono" style="color:#38bdf8;">${escapeHtml(mainOlt.host || '--')}:${escapeHtml(String(mainOlt.port || 22))}</strong> (${escapeHtml((mainOlt.protocol || 'SSH').toUpperCase())} Safe Read)`
+        : 'No physical OLT integrated • Click "Open OLT Manager" to link your hardware headend';
+    }
+    if (dashBadge) {
+      if (hasOlt && isOnline) {
+        dashBadge.className = 'tailadmin-badge success';
+        dashBadge.style.background = '';
+        dashBadge.style.color = '';
+        dashBadge.innerHTML = '<span class="pulse-dot"></span> 🟢 OLT UPLINK ACTIVE';
+      } else if (hasOlt) {
+        dashBadge.className = 'tailadmin-badge warning';
+        dashBadge.style.background = '';
+        dashBadge.style.color = '';
+        dashBadge.innerHTML = '🟡 OLT OFFLINE';
+      } else {
+        dashBadge.className = 'tailadmin-badge';
+        dashBadge.style.background = '#334155';
+        dashBadge.style.color = '#94a3b8';
+        dashBadge.innerHTML = '⚪ NO OLT LINKED';
+      }
+    }
+
     const dashCpuMem = document.getElementById('dashOltCpuMem');
     if (dashCpuMem) dashCpuMem.textContent = isOnline ? `${mainOlt.cpuUsage || 12}% / ${mainOlt.memUsage || 34}%` : '-- / --';
     const dashTemp = document.getElementById('dashOltTemp');
@@ -4944,8 +4970,8 @@ window.loadOltManagementView = async function() {
         fleetTbody.innerHTML = olts.map(o => {
           return `
             <tr>
-              <td><strong style="color:#ffffff;">${escapeHtml(o.name || 'Syrotech EPON Core')}</strong></td>
-              <td class="mono" style="color:#38bdf8;">${escapeHtml(o.host || '172.18.18.3')}:${escapeHtml(String(o.port || 22))}</td>
+              <td><strong style="color:#ffffff;">${escapeHtml(o.name || 'OLT Headend')}</strong></td>
+              <td class="mono" style="color:#38bdf8;">${escapeHtml(o.host || '--')}:${escapeHtml(String(o.port || 22))}</td>
               <td><span class="tailadmin-badge primary" style="font-size:0.7rem;">${escapeHtml(o.brand || 'Syrotech')}</span></td>
               <td><span class="tailadmin-badge success" style="font-size:0.7rem;">🟢 SAFE READ</span></td>
               <td style="text-align:center;">

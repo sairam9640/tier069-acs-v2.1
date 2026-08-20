@@ -928,8 +928,8 @@ function renderOperatorsTable(operators) {
   if (tblRecent) {
     tblRecent.innerHTML = operators.slice(0, 5).map(op => {
       const isSuspended = op.status === 'SUSPENDED';
-      const email = op.email || `${op.slug || 'operator'}@ciniplay.in`;
-      const phone = op.phone || '+91 96408 40216';
+      const email = op.email || '—';
+      const phone = op.phone || '—';
       const createdDate = op.createdAt ? new Date(op.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent';
 
       return `
@@ -1765,10 +1765,10 @@ window.loadSuperAdminOlts = async function() {
             <div style="font-size:0.72rem;color:#94a3b8;">Uptime: ${escapeHtml(o.uptime || '48 days')}</div>
           </td>
           <td><span style="font-size:0.75rem;color:#38bdf8;font-weight:600;">${escapeHtml(opName)}</span></td>
-          <td><span class="mono" style="color:#38bdf8;font-weight:700;">${escapeHtml(o.host || '172.18.18.3')}:${escapeHtml(String(o.port || 22))}</span></td>
-          <td><span style="color:#cbd5e1;font-size:0.78rem;">${escapeHtml(o.brand || 'Syrotech EPON OLT')}</span></td>
-          <td class="mono" style="font-weight:700;color:#ffffff;">${escapeHtml(String(o.ponCount || 4))} PON (${escapeHtml(String(o.activeOnts || 5))} ONTs)</td>
-          <td class="mono" style="font-size:0.75rem;color:#94a3b8;">CPU: ${escapeHtml(String(o.cpuUsage || 12))}% • Temp: ${escapeHtml(o.temperature || '41.8 °C')}</td>
+          <td><span class="mono" style="color:#38bdf8;font-weight:700;">${escapeHtml(o.host || '--')}:${escapeHtml(String(o.port || 22))}</span></td>
+          <td><span style="color:#cbd5e1;font-size:0.78rem;">${escapeHtml(o.brand || 'GPON / EPON OLT')}</span></td>
+          <td class="mono" style="font-weight:700;color:#ffffff;">${escapeHtml(String(o.ponCount || 4))} PON (${escapeHtml(String(o.activeOnts || 0))} ONTs)</td>
+          <td class="mono" style="font-size:0.75rem;color:#94a3b8;">CPU: ${escapeHtml(String(o.cpuUsage || 0))}% • Temp: ${escapeHtml(o.temperature || '--')}</td>
           <td><span class="sa-status-pill-online">🟢 SSH SYNCED</span></td>
           <td style="text-align:right;">
             <div style="display:inline-flex;gap:0.35rem;align-items:center;justify-content:flex-end;">
