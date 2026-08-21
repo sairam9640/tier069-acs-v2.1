@@ -419,7 +419,7 @@
             <div class="tailadmin-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.25rem;">
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
                 <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">CWMP Listening URL</div>
-                <div class="mono" id="dashCwmpUrlDisplay" style="font-size:0.85rem;color:#38bdf8;font-weight:700;margin-top:0.3rem;">--</div>
+                <div class="mono" id="dashCwmpUrlDisplay" style="font-size:0.85rem;color:#38bdf8;font-weight:700;margin-top:0.3rem;">http://ciniplay.in/</div>
               </div>
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;">
                 <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Average CWMP Latency</div>
@@ -823,6 +823,766 @@
                 <button class="btn-outline" style="padding:4px 10px;font-size:0.72rem;border-radius:6px;">Next</button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 2C: DEDICATED ONT DEVICE DETAILS & MULTI-TAB CONTROLLER (NOT A MODAL)
+             ===================================================================== -->
+        <section class="tab-view" id="view-device-details">
+          <style>
+            .dd-tab-btn {
+              background: transparent;
+              border: none;
+              border-bottom: 3px solid transparent;
+              padding: 0.75rem 1.25rem;
+              font-size: 0.85rem;
+              font-weight: 600;
+              color: #94a3b8;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              white-space: nowrap;
+            }
+            .dd-tab-btn:hover {
+              color: #ffffff;
+            }
+            .dd-tab-btn.active {
+              color: #38bdf8;
+              border-bottom-color: #38bdf8;
+            }
+            .dd-tab-content {
+              display: none;
+            }
+            .dd-tab-content.active {
+              display: block;
+            }
+          </style>
+
+          <!-- TOP BREADCRUMB & DEDICATED HEADER -->
+          <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+            <!-- Breadcrumb Navigation -->
+            <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:#94a3b8;margin-bottom:0.75rem;">
+              <a href="javascript:void(0)" onclick="switchTab('tr069')" style="color:#38bdf8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                <span>←</span> <span>Back to ONT Devices</span>
+              </a>
+              <span style="color:#475569;">/</span>
+              <span style="color:#ffffff;font-weight:600;" id="ddBreadcrumbSn">HWTC100ACD28</span>
+            </div>
+
+            <!-- Device Summary Banner -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+              <div style="display:flex;align-items:center;gap:1rem;">
+                <div style="width:48px;height:48px;border-radius:12px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">
+                  📡
+                </div>
+                <div>
+                  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <h2 style="font-size:1.35rem;font-weight:800;color:#ffffff;margin:0;" id="ddHeaderTitle">Huawei EG8145V5 Dual-Band ONT</h2>
+                    <span id="ddHeaderStatusBadge" class="tailadmin-badge success" style="font-size:0.72rem;">● online</span>
+                    <span id="ddHeaderVendorBadge" class="tailadmin-badge primary" style="font-size:0.72rem;background:rgba(99,102,241,0.15);border:1px solid #6366f1;color:#818cf8;">Huawei (X_HW)</span>
+                  </div>
+                  <div style="font-size:0.75rem;color:#94a3b8;margin-top:0.3rem;">
+                    SN: <strong class="mono" style="color:#ffffff;" id="ddHeaderSn">HWTC100ACD28</strong> • MAC: <span class="mono" style="color:#cbd5e1;" id="ddHeaderMac">34:E3:80:24:8E:60</span> • Subscriber: <strong style="color:#38bdf8;" id="ddHeaderCustomer">Unassigned</strong> • Last Inform: <span style="color:#94a3b8;" id="ddHeaderLastInform">Just now</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top Right Quick Actions & Summon Button -->
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn-primary" style="background:#7c3aed;border-color:#6d28d9;padding:0.5rem 1.25rem;font-size:0.8rem;font-weight:700;display:inline-flex;align-items:center;gap:6px;border-radius:8px;" onclick="summonCurrentDevice()" title="Send TR-069 Connection Request">
+                  <span>🔄</span> <span>Summon</span>
+                </button>
+                <button type="button" class="btn-outline" style="padding:0.5rem 1rem;font-size:0.8rem;color:#f59e0b;border-color:rgba(245,158,11,0.4);border-radius:8px;" onclick="quickRebootCurrentDevice()" title="Reboot Router Remotely">
+                  🔄 Reboot
+                </button>
+                <button type="button" class="btn-outline" style="padding:0.5rem 1rem;font-size:0.8rem;color:#ef4444;border-color:rgba(239,68,68,0.4);border-radius:8px;" onclick="factoryResetCurrentDevice()" title="Factory Reset">
+                  ⚠️ Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEDICATED TABS BAR (MATCHING SCREENSHOT 2/3) -->
+          <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:12px 12px 0 0;padding:0.5rem 1rem 0 1rem;display:flex;gap:0.5rem;border-bottom:1px solid rgba(255,255,255,0.08);overflow-x:auto;">
+            <button class="dd-tab-btn active" data-ddtab="dd-tab-ssid" onclick="switchDeviceDetailsTab('dd-tab-ssid')">📶 SSID Configuration</button>
+            <button class="dd-tab-btn" data-ddtab="dd-tab-wan" onclick="switchDeviceDetailsTab('dd-tab-wan')">🌐 WAN Configuration</button>
+            <button class="dd-tab-btn" data-ddtab="dd-tab-telemetry" onclick="switchDeviceDetailsTab('dd-tab-telemetry')">⚡ Telemetry &amp; Optical</button>
+            <button class="dd-tab-btn" data-ddtab="dd-tab-hosts" onclick="switchDeviceDetailsTab('dd-tab-hosts')">📱 Connected Devices</button>
+            <button class="dd-tab-btn" data-ddtab="dd-tab-customer" onclick="switchDeviceDetailsTab('dd-tab-customer')">👤 Customer &amp; GIS</button>
+            <button class="dd-tab-btn" data-ddtab="dd-tab-system" onclick="switchDeviceDetailsTab('dd-tab-system')">⚙️ System &amp; Actions</button>
+          </div>
+
+          <!-- DEDICATED TAB CONTENT CONTAINER (MINIMAL SCROLLING COMPACT CARDS) -->
+          <div style="background:var(--bg-boxdark,#1e293b);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 12px 12px;padding:1.5rem;">
+            
+            <!-- TAB 1: SSID CONFIGURATION (EXACT SCREENSHOT 2/3 MATCH) -->
+            <div class="dd-tab-content active" id="dd-tab-ssid">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                <h3 style="font-size:1.1rem;font-weight:700;color:#ffffff;margin:0;">SSID Configuration</h3>
+                <button type="button" class="btn-primary" style="background:#7c3aed;border-color:#6d28d9;padding:0.4rem 1rem;font-size:0.78rem;display:inline-flex;align-items:center;gap:6px;border-radius:8px;" onclick="summonCurrentDevice()">
+                  <span>🔄</span> <strong>Summon</strong>
+                </button>
+              </div>
+
+              <!-- 4-CARD 2x2 SSID GRID -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:1.25rem;">
+                <!-- CARD 1: SSID 1 -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                      <div style="width:42px;height:42px;border-radius:10px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;color:#3b82f6;font-size:1.3rem;">
+                        📶
+                      </div>
+                      <div>
+                        <div style="font-weight:700;color:#ffffff;font-size:1rem;">SSID 1</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;" id="ddSsid1Clients">👥 0 Connected</div>
+                      </div>
+                    </div>
+                    <span class="tailadmin-badge success" id="ddSsid1Badge" style="font-size:0.72rem;">● Active</span>
+                  </div>
+
+                  <div style="margin-bottom:0.75rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                    <div class="mono" style="font-size:0.95rem;font-weight:700;color:#ffffff;" id="ddSsid1Name">ZIMM-CD28</div>
+                  </div>
+
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                    <div class="mono" style="font-size:0.85rem;color:#cbd5e1;" id="ddSsid1Sec">WPAand11i</div>
+                  </div>
+
+                  <div style="text-align:right;">
+                    <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.45rem 1.1rem;font-size:0.78rem;border-radius:8px;" onclick="openDedicatedWifiEditModal(1)">
+                      ✏️ Edit Configuration
+                    </button>
+                  </div>
+                </div>
+
+                <!-- CARD 2: SSID 2 -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                      <div style="width:42px;height:42px;border-radius:10px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;color:#a855f7;font-size:1.3rem;">
+                        📶
+                      </div>
+                      <div>
+                        <div style="font-weight:700;color:#ffffff;font-size:1rem;">SSID 2 (5GHz)</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;" id="ddSsid2Clients">👥 0 Connected</div>
+                      </div>
+                    </div>
+                    <span class="tailadmin-badge" id="ddSsid2Badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.72rem;">● Inactive</span>
+                  </div>
+
+                  <div style="margin-bottom:0.75rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                    <div class="mono" style="font-size:0.95rem;font-weight:700;color:#ffffff;" id="ddSsid2Name">WIFI2.4G_01</div>
+                  </div>
+
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                    <div class="mono" style="font-size:0.85rem;color:#cbd5e1;" id="ddSsid2Sec">WPAand11i</div>
+                  </div>
+
+                  <div style="text-align:right;">
+                    <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.45rem 1.1rem;font-size:0.78rem;border-radius:8px;" onclick="openDedicatedWifiEditModal(2)">
+                      ✏️ Edit Configuration
+                    </button>
+                  </div>
+                </div>
+
+                <!-- CARD 3: SSID 3 -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                      <div style="width:42px;height:42px;border-radius:10px;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.3rem;">
+                        📶
+                      </div>
+                      <div>
+                        <div style="font-weight:700;color:#ffffff;font-size:1rem;">SSID 3</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;">👥 0 Connected</div>
+                      </div>
+                    </div>
+                    <span class="tailadmin-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.72rem;">● Inactive</span>
+                  </div>
+
+                  <div style="margin-bottom:0.75rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                    <div class="mono" style="font-size:0.95rem;font-weight:700;color:#ffffff;" id="ddSsid3Name">WIFI2.4G_02</div>
+                  </div>
+
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                    <div class="mono" style="font-size:0.85rem;color:#cbd5e1;">WPAand11i</div>
+                  </div>
+
+                  <div style="text-align:right;">
+                    <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.45rem 1.1rem;font-size:0.78rem;border-radius:8px;" onclick="openDedicatedWifiEditModal(3)">
+                      ✏️ Edit Configuration
+                    </button>
+                  </div>
+                </div>
+
+                <!-- CARD 4: SSID 4 -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                      <div style="width:42px;height:42px;border-radius:10px;background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.3);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.3rem;">
+                        📶
+                      </div>
+                      <div>
+                        <div style="font-weight:700;color:#ffffff;font-size:1rem;">SSID 4</div>
+                        <div style="font-size:0.75rem;color:#94a3b8;">👥 0 Connected</div>
+                      </div>
+                    </div>
+                    <span class="tailadmin-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.72rem;">● Inactive</span>
+                  </div>
+
+                  <div style="margin-bottom:0.75rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🏷️ Network Name</div>
+                    <div class="mono" style="font-size:0.95rem;font-weight:700;color:#ffffff;" id="ddSsid4Name">WIFI2.4G_03</div>
+                  </div>
+
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:0.2rem;">🔒 Security</div>
+                    <div class="mono" style="font-size:0.85rem;color:#cbd5e1;">WPAand11i</div>
+                  </div>
+
+                  <div style="text-align:right;">
+                    <button type="button" class="btn-primary" style="background:#2563eb;border-color:#1d4ed8;padding:0.45rem 1.1rem;font-size:0.78rem;border-radius:8px;" onclick="openDedicatedWifiEditModal(4)">
+                      ✏️ Edit Configuration
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- INLINE QUICK WIFI EDIT MODAL -->
+              <div id="ddWifiEditDrawer" style="display:none;background:rgba(15,23,42,0.95);border:1px solid #3b82f6;border-radius:12px;padding:1.5rem;margin-top:1.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                  <strong style="color:#38bdf8;font-size:0.95rem;" id="ddWifiEditTitle">✏️ Edit SSID 1 Configuration</strong>
+                  <button type="button" class="btn-outline" style="padding:2px 8px;" onclick="document.getElementById('ddWifiEditDrawer').style.display='none'">✕ Close</button>
+                </div>
+
+                <form id="formDdWifiEdit" onsubmit="event.preventDefault(); window.saveDedicatedWifiConfig(); return false;">
+                  <input type="hidden" id="ddEditSsidIndex" value="1">
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">Network Name (SSID):</label>
+                      <input type="text" id="ddEditSsidName" class="form-control mono" required>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">WPA/WPA2 Passphrase / Key:</label>
+                      <div style="display:flex;gap:0.4rem;">
+                        <input type="text" id="ddEditSsidPassword" class="form-control mono" style="font-weight:700;color:#10b981;" placeholder="WPA2 Passphrase (leave blank to keep current)">
+                        <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('ddEditSsidPassword')">👁️</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-grid-3" style="margin-top:0.75rem;">
+                    <div class="form-group">
+                      <label class="form-label">Security Mode:</label>
+                      <select id="ddEditSsidSecurity" class="form-control">
+                        <option value="WPAand11i">WPAand11i (WPA / WPA2-PSK)</option>
+                        <option value="WPA2-PSK">WPA2-PSK (AES)</option>
+                        <option value="11i">11i (WPA2 Only)</option>
+                        <option value="Basic">Basic (Open / WEP)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Radio Status:</label>
+                      <select id="ddEditSsidEnable" class="form-control">
+                        <option value="1">Enabled (Active)</option>
+                        <option value="0">Disabled (Inactive)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Broadcast SSID:</label>
+                      <select id="ddEditSsidHide" class="form-control">
+                        <option value="0">Broadcast (Visible)</option>
+                        <option value="1">Hidden (Hide SSID)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style="text-align:right;margin-top:1.25rem;">
+                    <button type="submit" class="btn-primary" style="background:#2563eb;padding:0.6rem 2rem;font-weight:700;">
+                      💾 Save &amp; Push to ONT via TR-069
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- TAB 2: WAN CONFIGURATION -->
+            <div class="dd-tab-content" id="dd-tab-wan">
+              <!-- Active Connection Interfaces Table -->
+              <div style="margin-bottom:1.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                  <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <strong style="color:#ffffff;font-size:0.95rem;">🌐 Router WAN Connection Profiles</strong>
+                    <span id="ddWanConnCountBadge" class="tailadmin-badge primary">1 Interface</span>
+                  </div>
+                  <div style="display:flex;gap:0.5rem;">
+                    <button type="button" class="btn-primary" style="background:#10b981;border-color:#059669;padding:0.35rem 0.85rem;font-size:0.75rem;border-radius:6px;" onclick="window.openAddWanDrawer()">
+                      ➕ Add WAN
+                    </button>
+                    <button type="button" class="btn-primary" style="background:#7c3aed;border-color:#6d28d9;padding:0.35rem 0.85rem;font-size:0.75rem;border-radius:6px;" onclick="summonCurrentDevice()">
+                      🔄 Refresh
+                    </button>
+                  </div>
+                </div>
+                <div class="tailadmin-table-wrap">
+                  <table class="tailadmin-table" style="font-size:0.78rem;">
+                    <thead>
+                      <tr>
+                        <th>Interface / Name</th>
+                        <th>Service</th>
+                        <th>Type</th>
+                        <th>VLAN ID</th>
+                        <th>Assigned IP</th>
+                        <th>Gateway</th>
+                        <th>Status</th>
+                        <th style="text-align:center;">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ddTblWanConnectionsBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Capability-Driven Add WAN Drawer -->
+              <div id="ddAddWanDrawer" style="display:none;background:rgba(15,23,42,0.95);border:1px solid #10b981;border-radius:12px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:1.2rem;">🌐</span>
+                    <strong style="color:#10b981;font-size:1rem;">Create New WAN Connection on ONT</strong>
+                  </div>
+                  <button type="button" class="btn-outline" style="padding:4px 10px;font-size:0.75rem;" onclick="document.getElementById('ddAddWanDrawer').style.display='none'">✕ Cancel</button>
+                </div>
+                <form id="formDdAddWan" onsubmit="event.preventDefault(); window.submitNewWanProfile(); return false;">
+                  <!-- Top Row: Connection Type, Service Type, IP Version -->
+                  <div class="form-grid-3">
+                    <div class="form-group">
+                      <label class="form-label">Connection Type:</label>
+                      <select id="ddNewWanType" class="form-control" onchange="window.updateAddWanFields(this.value)">
+                        <option value="PPPoE">PPPoE Routed</option>
+                        <option value="DHCP">IPoE / DHCP</option>
+                        <option value="Static">Static IP</option>
+                        <option value="Bridge">Bridge Mode</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Service Type:</label>
+                      <select id="ddNewWanService" class="form-control">
+                        <option value="INTERNET">Internet</option>
+                        <option value="VOIP">VoIP</option>
+                        <option value="OTHER">Other (IPTV / TR069)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">IP Version:</label>
+                      <select id="ddNewWanIpVersion" class="form-control">
+                        <option value="IPv4">IPv4</option>
+                        <option value="IPv6">IPv6</option>
+                        <option value="IPv4/IPv6" selected>IPv4 + IPv6 (Dual Stack)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Dynamic Panel 1: PPPoE Credentials -->
+                  <div id="ddAddWanPppPanel" style="margin-top:1rem;">
+                    <div class="form-grid-3">
+                      <div class="form-group">
+                        <label class="form-label">PPPoE Username:</label>
+                        <input type="text" id="ddNewWanUser" class="form-control mono font-bold" placeholder="e.g. user_ftth_101" style="color:#38bdf8;">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">PPPoE Secret Password:</label>
+                        <div style="display:flex;gap:0.4rem;">
+                          <input type="password" id="ddNewWanPass" class="form-control mono font-bold" placeholder="PPPoE Secret" style="color:#10b981;">
+                          <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('ddNewWanPass')" title="Toggle visibility">👁️</button>
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Service Name (Optional):</label>
+                        <input type="text" id="ddNewWanServiceName" class="form-control mono" placeholder="e.g. bsnl_ftth">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Dynamic Panel 2: Static IP Fields -->
+                  <div id="ddAddWanStaticPanel" style="display:none;margin-top:1rem;">
+                    <div class="form-grid-4">
+                      <div class="form-group">
+                        <label class="form-label">Static IP Address:</label>
+                        <input type="text" id="ddNewWanStaticIp" class="form-control mono" placeholder="e.g. 192.168.1.100">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Subnet Mask / Prefix:</label>
+                        <input type="text" id="ddNewWanSubnet" class="form-control mono" placeholder="255.255.255.0">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Default Gateway:</label>
+                        <input type="text" id="ddNewWanGateway" class="form-control mono" placeholder="e.g. 192.168.1.1">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">DNS Servers:</label>
+                        <input type="text" id="ddNewWanDns" class="form-control mono" placeholder="8.8.8.8, 1.1.1.1">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- VLAN & Routing Specs with Toggle Checkbox -->
+                  <div style="margin-top:1rem;padding:0.9rem;background:rgba(2,6,23,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin:0;">
+                        <input type="checkbox" id="ddNewWanVlanEnable" checked onchange="window.toggleNewWanVlan(this.checked)" style="accent-color:#10b981;width:16px;height:16px;">
+                        <strong style="color:#ffffff;font-size:0.88rem;">Enable VLAN Tagging (802.1Q)</strong>
+                      </label>
+                      <span style="font-size:0.72rem;color:#94a3b8;">Uncheck if ISP does not require VLAN tag (Untagged / Transparent)</span>
+                    </div>
+
+                    <div id="ddNewWanVlanFields" class="form-grid-3">
+                      <div class="form-group" id="ddNewWanVlanIdGroup">
+                        <label class="form-label">VLAN ID (1-4094):</label>
+                        <input type="number" id="ddNewWanVlan" class="form-control mono font-bold" placeholder="e.g. 100" min="1" max="4094" style="color:#38bdf8;">
+                      </div>
+                      <div class="form-group" id="ddNewWanVlanPriGroup">
+                        <label class="form-label">802.1p VLAN Priority (0-7):</label>
+                        <select id="ddNewWanVlanPri" class="form-control mono">
+                          <option value="0">0 (Best Effort - Normal)</option>
+                          <option value="1">1 (Background)</option>
+                          <option value="2">2 (Excellent Effort)</option>
+                          <option value="3">3 (Critical / Streaming)</option>
+                          <option value="4">4 (Video / IPTV &lt; 100ms)</option>
+                          <option value="5">5 (Voice / VoIP &lt; 10ms)</option>
+                          <option value="6">6 (Internetwork Control)</option>
+                          <option value="7">7 (Network Control)</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">MTU Size:</label>
+                        <input type="number" id="ddNewWanMtu" class="form-control mono" value="1492" min="576" max="1500">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- NAT & Default Route Switches -->
+                  <div id="ddAddWanRouteNatRow" style="display:flex;gap:2rem;margin-top:1rem;flex-wrap:wrap;font-size:0.82rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                      <input type="checkbox" id="ddNewWanNat" checked style="accent-color:#10b981;width:16px;height:16px;">
+                      <strong style="color:#ffffff;">NAT Enable</strong>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                      <input type="checkbox" id="ddNewWanDefaultRoute" checked style="accent-color:#10b981;width:16px;height:16px;">
+                      <strong style="color:#ffffff;">Default Route Gateway</strong>
+                    </label>
+                  </div>
+
+                  <!-- LAN & Wi-Fi Port Binding Selection -->
+                  <div style="margin-top:1rem;padding:0.9rem;background:rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
+                    <label class="form-label" style="margin-bottom:0.4rem;color:#94a3b8;">Port Binding / Interface Selection:</label>
+                    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;">
+                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="ddNewBindLan1" checked style="accent-color:#10b981;"> LAN1</label>
+                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="ddNewBindLan2" checked style="accent-color:#10b981;"> LAN2</label>
+                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="ddNewBindAp1" checked style="accent-color:#10b981;"> AP1 (2.4G)</label>
+                      <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;"><input type="checkbox" id="ddNewBindAp2" checked style="accent-color:#10b981;"> AP2 (5G)</label>
+                    </div>
+                  </div>
+
+                  <div style="text-align:right;margin-top:1.25rem;">
+                    <button type="submit" class="btn-primary" style="background:#10b981;border-color:#059669;padding:0.6rem 2rem;font-weight:700;font-size:0.85rem;border-radius:8px;">
+                      ➕ Provision WAN Profile via TR-069
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Edit WAN Settings Form -->
+              <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:1.25rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                  <strong style="color:#38bdf8;font-size:0.9rem;" id="ddWanEditHeading">✏️ Edit Selected WAN Profile</strong>
+                  <button type="button" class="btn-outline" style="color:#ef4444;border-color:rgba(239,68,68,0.4);font-size:0.75rem;padding:0.3rem 0.75rem;" id="btnDeleteSelectedWan" onclick="window.deleteSelectedWanProfile()">
+                    🗑️ Delete This WAN
+                  </button>
+                </div>
+                <form id="formDdWan" onsubmit="event.preventDefault(); window.saveDdWanConfig(); return false;">
+                  <input type="hidden" id="ddWanSelectedId" value="">
+                  <input type="hidden" id="ddWanSelectedPath" value="">
+                  <div class="form-grid-3">
+                    <div class="form-group">
+                      <label class="form-label">Connection Type:</label>
+                      <select id="ddWanConnType" class="form-control">
+                        <option value="PPPoE">PPPoE (Point-to-Point Protocol)</option>
+                        <option value="DHCP">DHCP (Dynamic IP / IPoE)</option>
+                        <option value="Static">Static IP</option>
+                        <option value="Bridge">Bridge Mode</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Connection Mode:</label>
+                      <select id="ddWanConnMode" class="form-control">
+                        <option value="IP_Routed">IP_Routed (Route Mode)</option>
+                        <option value="IP_Bridged">IP_Bridged</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">IP Protocol Version:</label>
+                      <select id="ddWanIpVersion" class="form-control">
+                        <option value="IPv4/IPv6">IPv4/IPv6 (Dual Stack)</option>
+                        <option value="IPv4">IPv4 Only</option>
+                        <option value="IPv6">IPv6 Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Edit WAN VLAN Section with Toggle -->
+                  <div style="margin-top:0.75rem;padding:0.9rem;background:rgba(2,6,23,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin:0;">
+                        <input type="checkbox" id="ddWanVlanEnable" checked onchange="window.toggleEditWanVlan(this.checked)" style="accent-color:#38bdf8;width:16px;height:16px;">
+                        <strong style="color:#ffffff;font-size:0.88rem;">Enable VLAN Tagging (802.1Q)</strong>
+                      </label>
+                      <span style="font-size:0.72rem;color:#94a3b8;">Untick if this WAN connection is Untagged / Native</span>
+                    </div>
+
+                    <div class="form-grid-3">
+                      <div class="form-group">
+                        <label class="form-label">Service Type:</label>
+                        <select id="ddWanServiceType" class="form-control">
+                          <option value="INTERNET_TR069">INTERNET_TR069</option>
+                          <option value="INTERNET">INTERNET</option>
+                          <option value="VOIP">VOIP</option>
+                          <option value="TR069">TR069</option>
+                        </select>
+                      </div>
+                      <div class="form-group" id="ddWanVlanIdGroup">
+                        <label class="form-label">VLAN ID (Tagging):</label>
+                        <input type="number" id="ddWanVlanId" class="form-control mono font-bold" placeholder="100" min="1" max="4094" style="color:#38bdf8;">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">MTU Size:</label>
+                        <input type="number" id="ddWanMtu" class="form-control mono" value="1492" min="576" max="1500">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-grid-2" style="margin-top:0.75rem;">
+                    <div class="form-group">
+                      <label class="form-label">PPPoE Username:</label>
+                      <input type="text" id="ddWanUsername" class="form-control mono" placeholder="e.g. user_ftth_101" style="font-weight:700;color:#38bdf8;">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">PPPoE Secret Password:</label>
+                      <div style="display:flex;gap:0.4rem;">
+                        <input type="text" id="ddWanPassword" class="form-control mono" placeholder="Enter new password to change" style="font-weight:700;color:#10b981;">
+                        <button type="button" class="btn-outline" style="padding:0.4rem 0.6rem;" onclick="togglePassVisibility('ddWanPassword')" title="Toggle visibility">👁️</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 1rem; padding: 1rem; background: rgba(15,23,42,0.6); border-radius: 8px;">
+                    <label class="form-label" style="margin-bottom: 0.5rem;">Port Binding Selection:</label>
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size:0.8rem;">
+                      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" id="ddBindLan1" checked style="accent-color:#3b82f6;"> LAN1</label>
+                      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" id="ddBindLan2" checked style="accent-color:#3b82f6;"> LAN2</label>
+                      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" id="ddBindAp1" checked style="accent-color:#3b82f6;"> AP1 (2.4G)</label>
+                      <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="checkbox" id="ddBindAp2" checked style="accent-color:#3b82f6;"> AP2 (5G)</label>
+                    </div>
+                  </div>
+
+                  <div style="text-align: right; margin-top: 1.25rem;">
+                    <button type="submit" class="btn-primary" style="padding: 0.65rem 2rem;font-weight:700;">
+                      💾 Update WAN Configuration
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- TAB 3: TELEMETRY & OPTICAL -->
+            <div class="dd-tab-content" id="dd-tab-telemetry">
+              <!-- 6 Metric Cards Grid -->
+              <div class="tailadmin-card-grid" style="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1rem;margin-bottom:1.5rem;">
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Optical Rx Power</div>
+                  <div class="mono" style="font-size:1.45rem;font-weight:800;color:#38bdf8;margin:0.25rem 0;" id="ddRxPower">-- dBm</div>
+                  <div style="font-size:0.72rem;font-weight:700;" id="ddRxHealthBadge">🟢 Normal Signal</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Optical Tx Power</div>
+                  <div class="mono" style="font-size:1.45rem;font-weight:800;color:#10b981;margin:0.25rem 0;" id="ddTxPower">-- dBm</div>
+                  <div style="font-size:0.72rem;color:#64748b;">Transceiver Output</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Core Temperature</div>
+                  <div class="mono" style="font-size:1.45rem;font-weight:800;color:#f59e0b;margin:0.25rem 0;" id="ddOptTemp">-- °C</div>
+                  <div style="font-size:0.72rem;color:#64748b;">Thermal Status</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Supply Voltage</div>
+                  <div class="mono" style="font-size:1.45rem;font-weight:800;color:#8b5cf6;margin:0.25rem 0;" id="ddOptVolt">3.30 V</div>
+                  <div style="font-size:0.72rem;color:#64748b;">SFP Power Rail</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Active Clients</div>
+                  <div class="mono" style="font-size:1.45rem;font-weight:800;color:#06b6d4;margin:0.25rem 0;" id="ddActiveClients">0 Hosts</div>
+                  <div style="font-size:0.72rem;color:#64748b;">WiFi + LAN Leases</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.15rem;">
+                  <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Uptime</div>
+                  <div class="mono" style="font-size:1.2rem;font-weight:800;color:#ffffff;margin:0.25rem 0;" id="ddUptime">--</div>
+                  <div style="font-size:0.72rem;color:#64748b;" id="ddLastSeen">Last Inform: --</div>
+                </div>
+              </div>
+
+              <!-- Optical Power History Table -->
+              <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.25rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                  <strong style="font-size:0.9rem;color:#ffffff;">📈 Optical Power Fluctuation History (≥ 1.0 dB Deltas)</strong>
+                  <span class="tailadmin-badge primary" id="ddOptHistoryBadge">0 Readings</span>
+                </div>
+                <div class="tailadmin-table-wrap" style="max-height:260px;overflow-y:auto;">
+                  <table class="tailadmin-table" style="font-size:0.78rem;">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Timestamp (IST)</th>
+                        <th>Rx Power</th>
+                        <th>Tx Power</th>
+                        <th>Delta</th>
+                        <th>Trend</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ddTblOpticalHistoryBody">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 4: CONNECTED DEVICES / LAN -->
+            <div class="dd-tab-content" id="dd-tab-hosts">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                <strong style="font-size:0.92rem;color:#ffffff;">📱 Connected Devices (DHCP Leases &amp; WiFi Clients)</strong>
+                <span class="tailadmin-badge primary" id="ddHostsCountBadge">0 Clients</span>
+              </div>
+              <div class="tailadmin-table-wrap">
+                <table class="tailadmin-table" style="font-size:0.78rem;">
+                  <thead>
+                    <tr>
+                      <th>Host / Device Name</th>
+                      <th>IP Address</th>
+                      <th>MAC Address</th>
+                      <th>Connection Interface</th>
+                      <th>Lease Time</th>
+                      <th style="text-align:center;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddTblHostsBody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TAB 5: CUSTOMER PROFILE & GIS -->
+            <div class="dd-tab-content" id="dd-tab-customer">
+              <form id="formDdCustomer" onsubmit="event.preventDefault(); window.saveDdCustomerConfig(); return false;">
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Subscriber Full Name:</label>
+                    <input type="text" id="ddCustName" class="form-control">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Mobile Phone Number:</label>
+                    <input type="text" id="ddCustPhone" class="form-control">
+                  </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-top:0.75rem;">
+                  <div class="form-group">
+                    <label class="form-label">Billing Account ID:</label>
+                    <input type="text" id="ddCustAccountId" class="form-control mono">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Assigned ODP / FDP Splitter:</label>
+                    <select id="ddCustFdpSelect" class="form-control">
+                      <option value="">-- Direct to OLT / Unassigned --</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-top:0.75rem;">
+                  <div class="form-group">
+                    <label class="form-label">GPS Latitude:</label>
+                    <input type="text" id="ddCustLat" class="form-control mono">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">GPS Longitude:</label>
+                    <input type="text" id="ddCustLng" class="form-control mono">
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top:0.75rem;">
+                  <label class="form-label">Installation Address / Notes:</label>
+                  <textarea id="ddCustAddress" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div style="text-align:right;margin-top:1.25rem;">
+                  <button type="submit" class="btn-primary" style="padding:0.65rem 2rem;font-weight:700;">
+                    💾 Save Subscriber Profile &amp; Location
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- TAB 6: SYSTEM & DIAGNOSTICS -->
+            <div class="dd-tab-content" id="dd-tab-system">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1.25rem;">
+                <!-- Remote Control Box -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.25rem;">
+                  <strong style="font-size:0.9rem;color:#38bdf8;display:block;margin-bottom:1rem;">⚡ Remote Actions &amp; Diagnostics</strong>
+                  <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                    <button type="button" class="btn-primary" style="background:#7c3aed;border-color:#6d28d9;padding:0.6rem 1rem;font-size:0.82rem;font-weight:700;" onclick="summonCurrentDevice()">
+                      🔄 Force TR-069 Summon (Connection Request)
+                    </button>
+                    <button type="button" class="btn-outline" style="color:#f59e0b;border-color:rgba(245,158,11,0.4);padding:0.6rem 1rem;font-size:0.82rem;font-weight:700;" onclick="quickRebootCurrentDevice()">
+                      🔄 Reboot ONT Remotely
+                    </button>
+                    <button type="button" class="btn-outline" style="color:#ef4444;border-color:rgba(239,68,68,0.4);padding:0.6rem 1rem;font-size:0.82rem;font-weight:700;" onclick="factoryResetCurrentDevice()">
+                      ⚠️ Factory Reset ONT Defaults
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Hardware Specifications Box -->
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.25rem;">
+                  <strong style="font-size:0.9rem;color:#818cf8;display:block;margin-bottom:0.75rem;">📋 Hardware &amp; CWMP Parameters</strong>
+                  <div style="display:flex;flex-direction:column;gap:0.45rem;font-size:0.78rem;">
+                    <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Software Version:</span> <span class="mono" style="color:#ffffff;" id="ddSwVer">--</span></div>
+                    <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Hardware Version:</span> <span class="mono" style="color:#cbd5e1;" id="ddHwVer">--</span></div>
+                    <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Product Class:</span> <span class="mono" style="color:#cbd5e1;" id="ddProdClass">--</span></div>
+                    <div style="display:flex;justify-content:space-between;"><span style="color:#94a3b8;">Connection Request URL:</span> <span class="mono" style="color:#64748b;font-size:0.7rem;overflow:hidden;text-overflow:ellipsis;max-width:200px;" id="ddCrUrl">--</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Live Ping Diagnostic Box -->
+              <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1.25rem;margin-top:1.25rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                  <strong style="font-size:0.9rem;color:#ffffff;">📡 Real-Time ICMP Ping Test</strong>
+                  <span id="ddPingBadge" class="tailadmin-badge primary">Idle</span>
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+                  <input type="text" id="ddPingIpInput" class="form-control mono" style="max-width:280px;font-size:0.8rem;" placeholder="Target IP to Ping">
+                  <button type="button" class="btn-primary" style="padding:0.4rem 1.25rem;font-size:0.78rem;" onclick="runDedicatedIpPing()">⚡ Send 4 Ping Packets</button>
+                </div>
+                <pre id="ddPingConsole" style="background:#090d16;color:#10b981;padding:0.75rem 1rem;border-radius:6px;font-size:0.75rem;font-family:'JetBrains Mono',monospace;margin:0;min-height:70px;white-space:pre-wrap;">Click 'Send 4 Ping Packets' to test ONT reachability...</pre>
+              </div>
+            </div>
+
           </div>
         </section>
 

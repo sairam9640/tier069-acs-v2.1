@@ -1033,9 +1033,9 @@ window.onOpSlugInput = function() {
   const slug = (document.getElementById('opSlug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
   const preview = document.getElementById('opCwmpUrlPreview');
   const editId = document.getElementById('opEditId')?.value;
-  const isFirst = (!currentOperators || currentOperators.length === 0) || slug === 'rudra' || slug === 'r' || editId === 'tenant_r';
+  const isPrimary = slug === 'rudra' || slug === 'r' || editId === 'tenant_r' || editId === 'tenant_rudra';
   if (preview) {
-    if (isFirst || !slug) {
+    if (isPrimary || !slug) {
       preview.textContent = 'http://ciniplay.in/';
     } else {
       preview.textContent = `http://${slug}.ciniplay.in/`;
@@ -1091,8 +1091,8 @@ window.saveOperatorKyc = async function() {
   const phone = (document.getElementById('opPhone').value || '').trim();
   const cleanPhone = phone.replace(/[^0-9]/g, '');
   const slug = (document.getElementById('opSlug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  const isFirst = (!currentOperators || currentOperators.length <= 1) || slug === 'rudra' || slug === 'r' || editId === 'tenant_r';
-  const domain = isFirst ? 'ciniplay.in' : `${slug}.ciniplay.in`;
+  const isPrimary = slug === 'rudra' || slug === 'r' || editId === 'tenant_r' || editId === 'tenant_rudra';
+  const domain = isPrimary ? 'ciniplay.in' : `${slug}.ciniplay.in`;
   const cwmpUrl = `http://${domain}/`;
 
   const payload = {

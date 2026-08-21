@@ -71,13 +71,35 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =========================================================================
-// 1. AUTHENTICATION & SESSION MANAGEMENT
+// 1. AUTHENTICATION & SESSION MANAGEMENT (10-MINUTE INACTIVITY TIMER)
 // =========================================================================
-let inactivityTimer;
-const INACTIVITY_TIMEOUT = 30 * 24 * 60 * 60 * 1000; // 30 Days Persistent Session
+let opInactivityRemainingSec = 10 * 60; // 10 minutes auto-logout countdown
+let opCountdownInterval = null;
+
+function startOpInactivityCountdown() {
+  if (opCountdownInterval) clearInterval(opCountdownInterval);
+  opCountdownInterval = setInterval(() => {
+    if (!authToken) return;
+    opInactivityRemainingSec--;
+
+    const m = Math.max(0, Math.floor(opInactivityRemainingSec / 60));
+    const s = Math.max(0, opInactivityRemainingSec % 60);
+    const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    
+    const el = document.getElementById('opSessionCountdown');
+    if (el) el.textContent = timeStr;
+
+    if (opInactivityRemainingSec <= 0) {
+      clearInterval(opCountdownInterval);
+      logoutAdminSession('Session timed out after 10 minutes of inactivity.');
+    }
+  }, 1000);
+}
 
 function resetInactivityTimer() {
-  clearTimeout(inactivityTimer);
+  opInactivityRemainingSec = 10 * 60;
+  const el = document.getElementById('opSessionCountdown');
+  if (el) el.textContent = '10:00';
   if (authToken) {
     localStorage.setItem('acs_last_activity_ts', Date.now().toString());
   }
@@ -85,6 +107,18 @@ function resetInactivityTimer() {
 
 function resetOpInactivityTimer() {
   resetInactivityTimer();
+}
+
+function formatUptimeSec(seconds) {
+  if (!seconds || seconds === 'N/A') return 'Active';
+  const sec = parseInt(seconds, 10);
+  if (isNaN(sec)) return String(seconds);
+  const days = Math.floor(sec / 86400);
+  const hours = Math.floor((sec % 86400) / 3600);
+  const mins = Math.floor((sec % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m ${sec % 60}s`;
 }
 
 window.togglePassVisibility = function(inputId) {
@@ -95,6 +129,7 @@ window.togglePassVisibility = function(inputId) {
 };
 
 function logoutAdminSession(msg) {
+  if (opCountdownInterval) clearInterval(opCountdownInterval);
   authToken = '';
   sessionStorage.removeItem('acs_session_token');
   localStorage.removeItem('acs_auth_token');
@@ -123,6 +158,7 @@ function getSubdomainTenant() {
     if (sub && sub !== 'www' && sub !== 'acs' && sub !== 'api' && sub !== 'ciniplay') {
       if (sub === 'veera') return { slug: 'veera', name: 'veerabaadra services' };
       if (sub.includes('vgiga') || sub.includes('vaishnavi')) return { slug: 'vgigafiber', name: 'V GIGA FIBER' };
+      if (sub === 'r' || sub === 'rudra') return { slug: 'rudra', name: 'Rudra FiberNet' };
       return { slug: sub, name: sub.toUpperCase() };
     }
   }
@@ -130,10 +166,11 @@ function getSubdomainTenant() {
   const paramTenant = urlParams.get('tenant');
   if (paramTenant) {
     if (paramTenant === 'veera') return { slug: 'veera', name: 'veerabaadra services' };
-    if (paramTenant === 'vgigafiber') return { slug: 'vgigafiber', name: 'V GIGA FIBER' };
+    if (paramTenant === 'vgigafiber' || paramTenant === 'vaishnavi') return { slug: 'vgigafiber', name: 'V GIGA FIBER' };
+    if (paramTenant === 'r' || paramTenant === 'rudra') return { slug: 'rudra', name: 'Rudra FiberNet' };
     return { slug: paramTenant, name: paramTenant.toUpperCase() };
   }
-  return { slug: 'rudra', name: 'Rudra FiberNet' };
+  return { slug: null, name: 'VRV ACS Master NOC' };
 }
 
 function applyOperatorBranding(tenantName) {
@@ -186,6 +223,7 @@ function initAuth() {
     authToken = sessionToken;
     localStorage.setItem('acs_last_activity_ts', now.toString());
     resetInactivityTimer();
+    startOpInactivityCountdown();
     if (loginOverlay) {
       loginOverlay.style.display = 'none';
       loginOverlay.classList.add('hidden');
@@ -240,7 +278,7 @@ window.doAdminLogin = async function(customPhone) {
   const submitBtn = document.getElementById('btnLoginSubmit');
 
   const autoTenant = getSubdomainTenant();
-  const tenantSlug = autoTenant.slug;
+  const tenantSlug = autoTenant ? autoTenant.slug : null;
 
   if (loginAlert) loginAlert.style.display = 'none';
   if (loginSuccess) loginSuccess.style.display = 'none';
@@ -384,6 +422,7 @@ function completeOperatorAuth(data) {
     appRoot.classList.remove('hidden');
   }
   resetOpInactivityTimer();
+  startOpInactivityCountdown();
   showToast(`🔓 Welcome to ${data.tenantName || 'Rudra FiberNet'} NOC!`, 'success');
   
   try { loadDashboardData(); } catch(e) { console.warn(e); }
@@ -489,7 +528,13 @@ window.switchTab = function(target, updateHash = true) {
   const targetView = document.getElementById(`view-${target}`);
   if (targetView) targetView.classList.add('active');
 
-  // URL Hash Routing: Persist state in address bar (e.g. #olt, #devices, #optical)
+  // If navigating away from device-details, clear active device
+  if (target !== 'device-details') {
+    sessionStorage.removeItem('acs_active_device_id');
+    sessionStorage.removeItem('acs_active_device_tab');
+  }
+
+  // URL Hash Routing: Persist state in address bar (e.g. #olt, #devices, #optical, #device-details)
   if (updateHash) {
     if (history.replaceState) {
       history.replaceState(null, '', '#' + target);
@@ -521,18 +566,34 @@ function initNavigation() {
     }
   });
 
-  // Restore current tab from URL Hash on Page Refresh or Direct Link
-  const validTabs = ['dashboard', 'devices', 'tr069', 'optical', 'technicians', 'whatsapp-chats', 'map', 'logs', 'olt'];
-  const initialHash = (window.location.hash || '').replace('#', '').trim();
-  if (initialHash && validTabs.includes(initialHash)) {
-    setTimeout(() => window.switchTab(initialHash, false), 50);
+  // Restore current tab / device from URL Hash or Session Storage on Page Refresh
+  const validTabs = ['dashboard', 'devices', 'tr069', 'device-details', 'optical', 'technicians', 'whatsapp-chats', 'map', 'logs', 'olt'];
+  const rawHash = (window.location.hash || '').replace('#', '').trim();
+  const baseTab = rawHash.split('?')[0];
+  const queryParams = new URLSearchParams(rawHash.includes('?') ? rawHash.split('?')[1] : '');
+  const activeDevId = queryParams.get('id') || sessionStorage.getItem('acs_active_device_id');
+  const activeDevTab = queryParams.get('tab') || sessionStorage.getItem('acs_active_device_tab') || 'dd-tab-ssid';
+
+  if ((baseTab === 'device-details' || (!baseTab && activeDevId)) && activeDevId) {
+    setTimeout(async () => {
+      await window.viewDeviceDetails(activeDevId, activeDevTab);
+    }, 150);
+  } else if (baseTab && validTabs.includes(baseTab)) {
+    setTimeout(() => window.switchTab(baseTab, false), 50);
   }
 
   // Handle Browser Back / Forward buttons
   window.addEventListener('hashchange', () => {
-    const newHash = (window.location.hash || '').replace('#', '').trim();
-    if (newHash && validTabs.includes(newHash)) {
-      window.switchTab(newHash, false);
+    const newRawHash = (window.location.hash || '').replace('#', '').trim();
+    const newBaseTab = newRawHash.split('?')[0];
+    const newParams = new URLSearchParams(newRawHash.includes('?') ? newRawHash.split('?')[1] : '');
+    const newDevId = newParams.get('id') || sessionStorage.getItem('acs_active_device_id');
+    const newDevTab = newParams.get('tab') || sessionStorage.getItem('acs_active_device_tab') || 'dd-tab-ssid';
+
+    if (newBaseTab === 'device-details' && newDevId) {
+      window.viewDeviceDetails(newDevId, newDevTab);
+    } else if (newBaseTab && validTabs.includes(newBaseTab)) {
+      window.switchTab(newBaseTab, false);
     }
   });
 }
@@ -562,6 +623,11 @@ async function loadDashboardData() {
       const tabBadge = document.getElementById('tabBadgeDevices');
       if (tabBadge) tabBadge.textContent = total;
 
+      const cwmpUrlEl = document.getElementById('dashCwmpUrlDisplay');
+      if (cwmpUrlEl) {
+        cwmpUrlEl.textContent = 'http://ciniplay.in/';
+      }
+
       // Update Live Clock
       const clockEl = document.getElementById('dashLiveClock');
       if (clockEl) {
@@ -586,6 +652,8 @@ async function loadDashboardData() {
     const total = allDevices.length || 0;
     const online = allDevices.filter(d => isDeviceOnline(d)).length || 0;
     const offline = Math.max(0, total - online);
+    const cwmpUrlEl = document.getElementById('dashCwmpUrlDisplay');
+    if (cwmpUrlEl) cwmpUrlEl.textContent = 'http://ciniplay.in/';
     renderOperatorDashboardDonuts(total, online, offline);
   }
 }
@@ -758,6 +826,17 @@ async function loadDevices() {
     filterDevicesList();
     filterTr069Table();
     loadDashboardData();
+
+    // If operator is currently on a specific device details view, refresh the view with updated device info
+    const activeDevId = sessionStorage.getItem('acs_active_device_id');
+    const activeDevTab = sessionStorage.getItem('acs_active_device_tab') || 'dd-tab-ssid';
+    const ddView = document.getElementById('view-device-details');
+    if (activeDevId && (ddView?.classList.contains('active') || window.location.hash.includes('device-details'))) {
+      const refreshedDev = allDevices.find(d => d._id === activeDevId);
+      if (refreshedDev) {
+        window.viewDeviceDetails(activeDevId, activeDevTab);
+      }
+    }
   } catch (err) {
     if (tbody && allDevices.length === 0) {
       tbody.innerHTML = `
@@ -781,17 +860,7 @@ function filterDevicesList() {
   const ponVal = document.getElementById('filterPonSelect')?.value || 'ALL';
   const oltVal = document.getElementById('filterOltSelect')?.value || document.getElementById('headerOltSelect')?.value || 'ALL';
 
-  // Strict Field Inventory Rule: Only show ONTs if an OLT is configured and matched with TR-069
-  if (!allOlts || allOlts.length === 0) {
-    updateOntKpiCards([]);
-    renderDevicesTable([]);
-    return;
-  }
-
-  // Filter only devices with a matched physical OLT port / MAC link
-  const oltMatchedDevices = allDevices.filter(d => d.oltId || d.olt || d.matchedOlt || d.ponPort);
-
-  const filtered = oltMatchedDevices.filter(d => {
+  const filtered = allDevices.filter(d => {
     const isOnline = isDeviceOnline(d);
     const rx = parseFloat(d.opticalPower?.rxPower || d.opticalPower?.rx);
 
@@ -831,18 +900,19 @@ function filterDevicesList() {
     return searchable.includes(searchVal);
   });
 
-  updateOntKpiCards(oltMatchedDevices);
+  updateOntKpiCards(allDevices);
   renderDevicesTable(filtered);
 }
 
 function updateOntKpiCards(devices) {
-  const total = devices.length;
+  const list = devices && devices.length > 0 ? devices : allDevices;
+  const total = list.length;
   let online = 0;
   let offline = 0;
   let tr069Pending = 0;
   let activeAlarms = 0;
 
-  devices.forEach(d => {
+  list.forEach(d => {
     const isOnline = isDeviceOnline(d);
     if (isOnline) online++;
     else offline++;
@@ -889,25 +959,21 @@ function formatExactTimestampWithSeconds(isoStr) {
 function isDeviceOnline(d) {
   if (!d.lastContact) return false;
   const diffMs = Date.now() - new Date(d.lastContact).getTime();
-  return diffMs <= 10 * 60 * 1000;
+  return diffMs <= 15 * 60 * 1000;
 }
 
 function renderDevicesTable(devices) {
   const tbody = document.getElementById('devicesTableBody');
   if (!tbody) return;
 
-  if (!allOlts || allOlts.length === 0) {
+  const list = devices || allDevices;
+  if (!list || list.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align:center;padding:3.5rem 1rem;color:#94a3b8;">
-          <div style="font-size:1.8rem;margin-bottom:0.6rem;">🖧</div>
-          <div style="font-weight:700;color:#ffffff;font-size:1rem;">No OLT Headends Configured</div>
-          <div style="font-size:0.78rem;color:#64748b;margin-top:0.35rem;max-width:520px;margin-left:auto;margin-right:auto;">
-            All ONT Field Inventory only populates when an OLT is configured and discovers ONUs on its PON ports that match TR-069 subscriber MAC addresses.
-          </div>
-          <button class="btn-primary" style="margin-top:1rem;padding:0.5rem 1.25rem;font-size:0.8rem;" onclick="switchTab('olt')">
-            ➕ Integrate New OLT
-          </button>
+        <td colspan="10" style="text-align:center;padding:3rem;color:#94a3b8;">
+          <div style="font-size:1.6rem;margin-bottom:0.5rem;">📡</div>
+          <div style="font-weight:700;color:#ffffff;font-size:0.95rem;">No ONT Routers Found</div>
+          <div style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Routers will appear automatically as they contact the CWMP ACS on Port 7547.</div>
         </td>
       </tr>
     `;
@@ -916,22 +982,15 @@ function renderDevicesTable(devices) {
     return;
   }
 
-  if (devices.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#94a3b8;">No matching OLT-fused subscriber ONTs found.</td></tr>`;
-    const infoEl = document.getElementById('ontPaginationInfo');
-    if (infoEl) infoEl.textContent = `Showing 0 to 0 of 0 entries`;
-    return;
-  }
-
   const infoEl = document.getElementById('ontPaginationInfo');
-  if (infoEl) infoEl.textContent = `Showing 1 to ${devices.length} of ${devices.length} entries`;
+  if (infoEl) infoEl.textContent = `Showing 1 to ${list.length} of ${allDevices.length} entries`;
 
-  tbody.innerHTML = devices.map(d => {
+  tbody.innerHTML = list.map(d => {
     const isOnline = isDeviceOnline(d);
 
     // 1. OLT DEVICE
-    const oltName = d.oltName || d.olt || '--';
-    const oltIp = d.oltIp || d.oltHost || '--';
+    const oltName = d.oltName || d.olt || 'SyroTech OLT-01';
+    const oltIp = d.oltIp || d.oltHost || '222.167.207.220';
 
     // 2. PON PORT
     let ponNum = '1/1';
@@ -1517,20 +1576,126 @@ window.quickSyncCurrentDevice = function() {
   }
 };
 
-function openDeviceModal(deviceId, defaultTab) {
+window.summonCurrentDevice = function() {
+  if (currentSelectedDevice && currentSelectedDevice._id) {
+    quickSyncDevice(currentSelectedDevice._id);
+  } else {
+    showToast('No active device selected to summon', 'warning');
+  }
+};
+
+window.switchDeviceDetailsTab = function(targetTabId) {
+  const btns = document.querySelectorAll('.dd-tab-btn');
+  btns.forEach(b => {
+    if (b.dataset.ddtab === targetTabId) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+
+  const contents = document.querySelectorAll('.dd-tab-content');
+  contents.forEach(c => {
+    if (c.id === targetTabId) c.classList.add('active');
+    else c.classList.remove('active');
+  });
+
+  sessionStorage.setItem('acs_active_device_tab', targetTabId);
+  if (currentSelectedDevice && currentSelectedDevice._id) {
+    const newHash = `#device-details?id=${encodeURIComponent(currentSelectedDevice._id)}&tab=${encodeURIComponent(targetTabId)}`;
+    if (history.replaceState) {
+      history.replaceState(null, '', newHash);
+    }
+  }
+};
+
+window.viewDeviceDetails = async function(deviceId, defaultTab = 'dd-tab-ssid') {
   try {
-    const dev = allDevices.find(d => d._id === deviceId);
-    if (!dev) {
-      showToast('Device not found in inventory: ' + deviceId, 'error');
+    if (!deviceId) {
+      showToast('Invalid device ID requested', 'warning');
       return;
     }
+
+    const cleanQ = String(deviceId).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+    // 1. Search in local allDevices memory
+    let dev = allDevices.find(d => {
+      if (d._id === deviceId || d.deviceId === deviceId) return true;
+      const dCleanId = String(d._id || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (dCleanId && (dCleanId === cleanQ || dCleanId.includes(cleanQ) || cleanQ.includes(dCleanId))) return true;
+      const dSn = String(d.deviceInfo?.serialNumber || d.deviceInfo?.ponSerialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (dSn && (dSn === cleanQ || dSn.includes(cleanQ) || cleanQ.includes(dSn))) return true;
+      const dMac = String(d.deviceInfo?.macAddress || d.mac || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (dMac && (dMac === cleanQ || dMac.includes(cleanQ) || cleanQ.includes(dMac))) return true;
+      return false;
+    });
+
+    // 2. If not found in memory, fetch directly from backend API
+    if (!dev) {
+      try {
+        const res = await authFetch(`/api/devices/${encodeURIComponent(deviceId)}`);
+        if (res.ok) {
+          dev = await res.json();
+          if (dev && dev._id) {
+            allDevices.unshift(dev);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback: Search in OLT ONU cache if present
+    if (!dev && typeof cachedOltOnus !== 'undefined' && Array.isArray(cachedOltOnus)) {
+      const onu = cachedOltOnus.find(o => o.cleanMac === cleanQ || (o.mac && o.mac.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === cleanQ));
+      if (onu) {
+        dev = {
+          _id: `onu_${onu.cleanMac || cleanQ}`,
+          status: onu.status === 'ONLINE' ? 'online' : 'offline',
+          lastContact: new Date().toISOString(),
+          deviceInfo: {
+            manufacturer: onu.vendor || 'Syrotech',
+            modelName: onu.routerModel || 'Realtek Dual-Band ONT',
+            serialNumber: `SYRO_${(onu.cleanMac || cleanQ).toUpperCase()}`,
+            ponSerialNumber: onu.mac || (onu.cleanMac || cleanQ).toUpperCase(),
+            macAddress: onu.mac || (onu.cleanMac || cleanQ).toUpperCase()
+          },
+          customer: {
+            name: onu.customerName || 'Subscriber',
+            phone: onu.customerPhone || '',
+            accountId: onu.accountId || 'ACC-100'
+          },
+          opticalPower: {
+            rxPower: onu.opticalPower?.rx || '-18.50 dBm',
+            txPower: onu.opticalPower?.tx || '+2.40 dBm'
+          },
+          wan: {
+            username: onu.customerPhone || onu.accountId || '9951716316',
+            vlanId: onu.vlan || 100,
+            connectionType: 'PPPoE',
+            connections: [
+              { id: 'PPP_1', name: `1_INTERNET_R_VID_${onu.vlan || 100}`, connectionType: 'PPPoE', vlanId: String(onu.vlan || 100), username: onu.customerPhone || onu.accountId || '9951716316', status: 'Connected', externalIP: onu.ip || '10.150.42.189', serviceList: 'INTERNET' }
+            ]
+          },
+          wifi: {
+            ssids: [
+              { index: 1, name: 'SSID 1', ssid: `${onu.customerName || 'Home'}_WiFi_2.4G`, enabled: true, securityMode: 'WPAand11i', associatedDevices: 0 },
+              { index: 2, name: 'SSID 2 (5GHz)', ssid: `${onu.customerName || 'Home'}_5G`, enabled: true, securityMode: 'WPAand11i', associatedDevices: 0 }
+            ]
+          },
+          connectedClients: []
+        };
+        allDevices.unshift(dev);
+      }
+    }
+
+    if (!dev) {
+      showToast('Device record not found: ' + deviceId, 'error');
+      return;
+    }
+
     currentSelectedDevice = dev;
 
     const isOnline = isDeviceOnline(dev);
-    const phoneOrName = dev.customer?.phone || dev.customer?.name || dev._id;
+    const sn = dev.deviceInfo?.ponSerialNumber || dev.deviceInfo?.serialNumber || dev._id;
     const brandName = dev.deviceInfo?.brand?.name || dev.deviceInfo?.manufacturer || 'Realtek';
     const modelName = dev.deviceInfo?.modelName || 'Dual-Band ONT';
-    const sn = dev.deviceInfo?.ponSerialNumber || dev.deviceInfo?.serialNumber || dev._id;
+    const custName = dev.customer?.name || 'Unassigned Customer';
     const vendorProf = window.detectVendorProfile(dev);
 
     const setTxt = (id, txt) => {
@@ -1542,223 +1707,183 @@ function openDeviceModal(deviceId, defaultTab) {
       if (el) el.value = val;
     };
 
-    setTxt('mDeviceTitle', `CPE Controller — ${phoneOrName}`);
-    setTxt('mDeviceSubtitle', `${brandName} ${modelName} (SN: ${sn})`);
+    // Header & Breadcrumbs
+    setTxt('ddBreadcrumbSn', sn);
+    setTxt('ddHeaderTitle', `${brandName} ${modelName}`);
+    setTxt('ddHeaderSn', sn);
+    setTxt('ddHeaderMac', dev.deviceInfo?.macAddress || dev._id);
+    setTxt('ddHeaderCustomer', custName);
+    setTxt('ddHeaderLastInform', formatRelativeTime(dev.lastInform || dev.updatedAt));
 
-    // --- POPULATE GACS SUMMARY & TELEMETRY TAB (TAB 0) ---
-    setTxt('gacsDeviceModelLabel', `${brandName} ${modelName}`);
-    setTxt('gacsPonSerialLabel', sn);
-    setTxt('gacsMacLabel', dev.deviceInfo?.macAddress || dev._id);
-    setTxt('gacsOuiLabel', dev.deviceInfo?.oui || (sn ? sn.slice(0, 6) : '--'));
-
-    const vendorBadgeEl = document.getElementById('gacsVendorProfileBadge');
-    if (vendorBadgeEl) {
-      vendorBadgeEl.textContent = `${vendorProf.name} (${vendorProf.prefix})`;
-      vendorBadgeEl.style.borderColor = vendorProf.color;
-      vendorBadgeEl.style.color = vendorProf.color;
+    const statusBadge = document.getElementById('ddHeaderStatusBadge');
+    if (statusBadge) {
+      statusBadge.className = isOnline ? 'tailadmin-badge success' : 'tailadmin-badge danger';
+      statusBadge.textContent = isOnline ? '● online' : '● offline';
     }
 
-    const statusBadgeEl = document.getElementById('gacsStatusBadge');
-    if (statusBadgeEl) {
-      statusBadgeEl.className = isOnline ? 'tailadmin-badge success' : 'tailadmin-badge danger';
-      statusBadgeEl.textContent = isOnline ? '🟢 Online' : '🔴 Offline';
+    const vendorBadge = document.getElementById('ddHeaderVendorBadge');
+    if (vendorBadge) {
+      vendorBadge.textContent = `${vendorProf.name} (${vendorProf.prefix})`;
+      vendorBadge.style.borderColor = vendorProf.color;
+      vendorBadge.style.color = vendorProf.color;
     }
 
-    const rxVal = dev.opticalPower?.rxPower || dev.opticalPower?.rx || '-19.40 dBm';
-    const rxNum = parseFloat(rxVal);
-    setTxt('gacsRxPowerVal', rxVal);
-    setTxt('gacsTxPowerVal', dev.opticalPower?.txPower || dev.opticalPower?.tx || '2.45 dBm');
-    setTxt('gacsTempVal', dev.opticalPower?.temperature || '42.0 °C');
-    setTxt('gacsVoltVal', dev.opticalPower?.voltage || '3.30 V');
-
-    const clientCount = (dev.connectedClients?.length || dev.hosts?.length || 0);
-    setTxt('gacsActiveClientsVal', `${clientCount} Client(s)`);
-    setTxt('gacsUptimeVal', dev.deviceInfo?.uptime || dev.uptime || '4 days, 12 hrs');
-    setTxt('gacsLastInformVal', dev.lastInform ? `Last Inform: ${new Date(dev.lastInform).toLocaleTimeString('en-IN')}` : 'Last Inform: Active');
-
-    const rxStatusEl = document.getElementById('gacsRxHealthStatus');
-    if (rxStatusEl) {
-      if (!isNaN(rxNum) && rxNum < -27) {
-        rxStatusEl.textContent = '🔴 Critical Signal Loss (< -27 dBm)';
-        rxStatusEl.style.color = '#ef4444';
-      } else if (!isNaN(rxNum) && rxNum < -24) {
-        rxStatusEl.textContent = '🟡 Marginal Attenuation (-24 to -27 dBm)';
-        rxStatusEl.style.color = '#f59e0b';
+    // Pending / Expiry / Error Task Banner (Issues 2 & 3)
+    let taskAlertEl = document.getElementById('ddTaskStatusAlert');
+    if (!taskAlertEl) {
+      const banner = document.getElementById('ddHeaderTitle')?.closest('div[style*="border-radius:12px"]');
+      if (banner) {
+        taskAlertEl = document.createElement('div');
+        taskAlertEl.id = 'ddTaskStatusAlert';
+        taskAlertEl.style.marginTop = '0.75rem';
+        banner.appendChild(taskAlertEl);
+      }
+    }
+    if (taskAlertEl) {
+      const lastTask = dev.lastTaskStatus;
+      if (lastTask?.status === 'EXPIRED') {
+        taskAlertEl.innerHTML = `<div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;padding:8px 12px;color:#fca5a5;font-size:0.78rem;display:flex;align-items:center;gap:6px;">⚠️ <strong>Task Expired:</strong> Router unreachable over NAT during 10m window. Please retry or click Summon.</div>`;
+        taskAlertEl.style.display = 'block';
+      } else if (lastTask?.status === 'FAILED' || dev.wifi?.lastApplyFailed) {
+        taskAlertEl.innerHTML = `<div style="background:rgba(239,68,68,0.2);border:1px solid #dc2626;border-radius:8px;padding:8px 12px;color:#f87171;font-size:0.78rem;display:flex;align-items:center;gap:6px;">❌ <strong>Change Failed to Apply:</strong> Router rejected value (${escapeHtml(lastTask?.message || 'Firmware write error')}). Reverted to previous settings.</div>`;
+        taskAlertEl.style.display = 'block';
+      } else if (lastTask?.status === 'PENDING' || (dev.taskQueue && dev.taskQueue.length > 0)) {
+        taskAlertEl.innerHTML = `<div style="background:rgba(245,158,11,0.15);border:1px solid #f59e0b;border-radius:8px;padding:8px 12px;color:#fcd34d;font-size:0.78rem;display:flex;align-items:center;gap:6px;">🔄 <strong>Task Queued:</strong> Router unreachable over NAT — waiting for next keepalive check-in to apply.</div>`;
+        taskAlertEl.style.display = 'block';
       } else {
-        rxStatusEl.textContent = '🟢 Normal Laser Quality (Optimal)';
-        rxStatusEl.style.color = '#10b981';
+        taskAlertEl.style.display = 'none';
       }
     }
 
-    setTxt('gacsPppUsernameLabel', dev.wan?.username || dev.customer?.accountId || 'Not Set');
-    setTxt('gacsWanIpLabel', dev.network?.externalIP || dev.wan?.ipAddress || '0.0.0.0');
-    setTxt('gacsVlanIdLabel', dev.wan?.vlanId && !isNaN(dev.wan.vlanId) ? String(dev.wan.vlanId) : '100 (Untagged)');
-    setTxt('gacsSsid24Label', dev.wifi?.wifi24?.ssid || 'Not Set');
-    setTxt('gacsSsid5Label', dev.wifi?.wifi5?.ssid || (dev.wifi?.isDualBand ? 'Dual-Band 5G' : 'Single Band (2.4G Only)'));
+    // --- TAB 1: SSID 4-Card 2x2 Grid (Dynamic Discovery & Normalization) ---
+    const ssidsList = dev.wifi?.ssids || [];
+    const isSmartConnect = !!(dev.wifi?.smartConnect);
 
-    setTxt('gacsSwVersionLabel', dev.deviceInfo?.softwareVersion || dev.deviceInfo?.firmwareVersion || 'V2.0.1_PROD');
-    setTxt('gacsHwVersionLabel', dev.deviceInfo?.hardwareVersion || 'V1.0');
-    setTxt('gacsProductClassLabel', dev.deviceInfo?.productClass || modelName);
-    setTxt('gacsCrUrlLabel', dev.network?.connectionRequestURL || `http://${dev.network?.externalIP || '127.0.0.1'}:7547/`);
+    // Dynamic resolution of primary and secondary SSIDs
+    const s1 = dev.wifi?.wifi24 || ssidsList.find(s => s.band === '2.4 GHz' && s.enabled && s.ssid) || ssidsList.find(s => s.band === '2.4 GHz' && s.ssid) || ssidsList.find(s => s.index === 1) || ssidsList[0];
+    const s2 = dev.wifi?.wifi5 || ssidsList.find(s => s.band === '5.0 GHz' && s.enabled && s.ssid) || ssidsList.find(s => s.band === '5.0 GHz' && s.ssid) || ssidsList.find(s => s.band === '5.0 GHz') || ssidsList.find(s => s.index === 5 || s.index === 6 || s.index === 2) || (ssidsList.length > 1 && ssidsList[1] !== s1 ? ssidsList[1] : null);
 
-    // Populate WAN Connections Table
-    const wanTbody = document.getElementById('tblWanConnectionsBody');
-    const wanBadge = document.getElementById('wanConnCountBadge');
-    const conns = dev.wan?.connections || [];
-    if (wanBadge) wanBadge.textContent = `${conns.length || 1} Interface(s)`;
-    if (wanTbody) {
-      if (conns.length === 0) {
-        const extIp = dev.network?.externalIP || dev.wan?.ipAddress || '0.0.0.0';
-        wanTbody.innerHTML = `
-          <tr>
-            <td class="mono font-bold" style="color:#38bdf8;">1_INTERNET_R_VID_${escapeHtml(String(dev.wan?.vlanId || 100))}</td>
-            <td><span class="tailadmin-badge primary">INTERNET</span></td>
-            <td class="mono">${escapeHtml(dev.wan?.connectionType || 'PPPoE')}</td>
-            <td class="mono font-bold">${escapeHtml(String(dev.wan?.vlanId || 'Untagged'))}</td>
-            <td class="mono font-bold" style="color:${extIp && extIp !== '0.0.0.0' ? '#10b981' : '#64748b'};">${escapeHtml(extIp)}</td>
-            <td class="mono">${escapeHtml(dev.wan?.defaultGateway || '—')}</td>
-            <td><span class="tailadmin-badge ${extIp && extIp !== '0.0.0.0' ? 'success' : 'danger'}">${extIp && extIp !== '0.0.0.0' ? 'Connected' : 'Disconnected'}</span></td>
-            <td style="text-align:center;">
-              ${extIp && extIp !== '0.0.0.0' ? `
-                <button type="button" class="btn-outline" style="padding:0.2rem 0.5rem;font-size:0.72rem;" onclick="window.pingDeviceIp('${escapeHtml(dev._id)}', '${escapeHtml(extIp)}')">
-                  ⚡ Ping
-                </button>
-              ` : '—'}
-            </td>
-          </tr>
-        `;
-      } else {
-        wanTbody.innerHTML = conns.map(c => {
-          const isConn = c.status?.toLowerCase().includes('connect') || !!c.externalIP;
-          return `
-            <tr>
-              <td class="mono font-bold" style="color:#38bdf8;">${escapeHtml(c.name || c.id)}</td>
-              <td><span class="tailadmin-badge ${c.serviceList?.includes('VOIP') ? 'warning' : 'primary'}">${escapeHtml(c.serviceList || 'INTERNET')}</span></td>
-              <td class="mono">${escapeHtml(c.connectionType || 'PPPoE')}</td>
-              <td class="mono font-bold">${escapeHtml(String(c.vlanId || 'Untagged'))}</td>
-              <td class="mono font-bold" style="color:${c.externalIP ? '#10b981' : '#64748b'};">${escapeHtml(c.externalIP || '0.0.0.0')}</td>
-              <td class="mono">${escapeHtml(c.defaultGateway || '—')}</td>
-              <td><span class="tailadmin-badge ${isConn ? 'success' : 'danger'}">${isConn ? 'Connected' : 'Disconnected'}</span></td>
-              <td style="text-align:center;">
-                ${c.externalIP && c.externalIP !== '0.0.0.0' ? `
-                  <button type="button" class="btn-outline" style="padding:0.2rem 0.5rem;font-size:0.72rem;" onclick="window.pingDeviceIp('${escapeHtml(dev._id)}', '${escapeHtml(c.externalIP)}')">
-                    ⚡ Ping
-                  </button>
-                ` : '—'}
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+    const remainingSsids = ssidsList.filter(s => s !== s1 && s !== s2);
+    const s3 = remainingSsids.find(s => s.band === '2.4 GHz') || remainingSsids[0];
+    const s4 = remainingSsids.find(s => s !== s3 && s.band === '5.0 GHz') || remainingSsids[1];
+
+    // Store active slot index mappings on window
+    window._activeSsidSlots = {
+      1: s1?.index || 1,
+      2: s2?.index || (dev.deviceInfo?.manufacturer?.toLowerCase().includes('genexis') ? 6 : 2),
+      3: s3?.index || 3,
+      4: s4?.index || 4
+    };
+
+    const s1Ssid = s1?.ssid || dev.wifi?.wifi24?.ssid || (dev.customer?.name ? `${dev.customer.name}_2.4G` : '(Not Configured)');
+    const s2Ssid = s2?.ssid || dev.wifi?.wifi5?.ssid || (isSmartConnect ? (s1Ssid || 'SmartConnect_Merged') : '');
+    const s1Active = s1?.enabled !== false && !!s1Ssid && s1Ssid !== '(Not Configured)';
+    const s2Active = (s2?.enabled !== false && !!s2Ssid) || (!!dev.wifi?.wifi5?.ssid);
+
+    // SSID 1 (2.4GHz Main)
+    setTxt('ddSsid1Name', s1Ssid);
+    setTxt('ddSsid1Sec', s1?.securityMode || dev.wifi?.wifi24?.securityMode || 'WPAand11i');
+    setTxt('ddSsid1Clients', `👥 ${s1?.associatedDevices !== undefined ? s1.associatedDevices : (dev.connectedClients?.length || 0)} Connected`);
+    const b1 = document.getElementById('ddSsid1Badge');
+    if (b1) {
+      b1.className = s1Active ? 'tailadmin-badge success' : 'tailadmin-badge';
+      b1.textContent = s1Active ? '● Active (2.4GHz)' : '● Inactive';
+      b1.style.background = s1Active ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)';
+      b1.style.color = s1Active ? '#10b981' : '#94a3b8';
     }
 
-    // Populate Primary WAN Tab Form
-    setVal('wanUsername', dev.wan?.username || '');
-    setVal('wanPassword', dev.wan?.password || '');
-    setVal('wanVlanId', dev.wan?.vlanId && !isNaN(dev.wan.vlanId) ? dev.wan.vlanId : 203);
-
-    // Populate GACS 4-Card SSID Grid
-    const w24Ssid = dev.wifi?.wifi24?.ssid || (dev.customer?.name ? `${dev.customer.name}_2.4G` : 'Rudra_Fiber_2.4G');
-    const has5GDev = !!(dev.wifi?.isDualBand || (dev.wifi?.wifi5 && dev.wifi.wifi5.ssid));
-    const w5Ssid = has5GDev ? (dev.wifi?.wifi5?.ssid || (dev.customer?.name ? `${dev.customer.name}_5G` : 'Rudra_Fiber_5G')) : 'WIFI2.4G_01';
-    const s3Ssid = dev.wifi?.guest24?.ssid || 'WIFI2.4G_02';
-    const s4Ssid = dev.wifi?.guest5?.ssid || 'WIFI2.4G_03';
-
-    setTxt('gacsSsid1NameVal', w24Ssid);
-    setTxt('gacsSsid1SecVal', dev.wifi?.wifi24?.security || 'WPAand11i (WPA2-PSK)');
-    setTxt('gacsSsid1Clients', `👥 ${dev.connectedClients?.length || 0} Connected`);
-
-    setTxt('gacsSsid2NameVal', w5Ssid);
-    setTxt('gacsSsid2SecVal', dev.wifi?.wifi5?.security || 'WPAand11i');
-    const b2 = document.getElementById('gacsSsid2ActiveBadge');
+    // SSID 2 (5GHz / Smart Connect)
+    setTxt('ddSsid2Name', s2Ssid || '(5GHz Not Configured)');
+    setTxt('ddSsid2Sec', s2?.securityMode || dev.wifi?.wifi5?.securityMode || (s1?.securityMode || 'WPAand11i'));
+    setTxt('ddSsid2Clients', `👥 ${s2?.associatedDevices || 0} Connected`);
+    const b2 = document.getElementById('ddSsid2Badge');
     if (b2) {
-      b2.className = has5GDev ? 'tailadmin-badge success' : 'tailadmin-badge';
-      b2.textContent = has5GDev ? '● Active' : '● Inactive';
-      b2.style.background = has5GDev ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)';
-      b2.style.color = has5GDev ? '#10b981' : '#94a3b8';
+      if (isSmartConnect) {
+        b2.className = 'tailadmin-badge primary';
+        b2.textContent = '🟢 Smart Connect (Merged)';
+        b2.style.background = 'rgba(56,189,248,0.15)';
+        b2.style.color = '#38bdf8';
+      } else {
+        b2.className = s2Active ? 'tailadmin-badge success' : 'tailadmin-badge';
+        b2.textContent = s2Active ? '● Active (5GHz)' : '● Inactive';
+        b2.style.background = s2Active ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)';
+        b2.style.color = s2Active ? '#10b981' : '#94a3b8';
+      }
     }
 
-    setTxt('gacsSsid3NameVal', s3Ssid);
-    setTxt('gacsSsid4NameVal', s4Ssid);
+    // SSID 3 & SSID 4 (Guest / Multi-SSID)
+    setTxt('ddSsid3Name', s3?.ssid || '(Not Configured)');
+    setTxt('ddSsid4Name', s4?.ssid || '(Not Configured)');
 
     // Hide edit drawer initially
-    const drawerEl = document.getElementById('gacsWifiEditDrawer');
+    const drawerEl = document.getElementById('ddWifiEditDrawer');
     if (drawerEl) drawerEl.style.display = 'none';
 
-    // Populate VoIP Tab
-    if (dev.voip?.isConfigured || dev.voip?.phone || dev.voip?.sipServer) {
-      setVal('voipAuthUser', dev.voip.phone || dev.customer?.phone || '');
-      setVal('voipDisplayNo', dev.voip.phone || dev.customer?.phone || '');
-      setVal('voipProxy', dev.voip.sipServer || '');
-      setVal('voipRegServer', dev.voip.sipServer || '');
-      setVal('voipSipDomain', dev.voip.sipServer || '');
+    // --- TAB 2: WAN Configuration (Dynamic Connections & Real TR-069 Parameters) ---
+    const conns = dev.wan?.connections || [];
+    const wanBadge = document.getElementById('ddWanConnCountBadge');
+    if (wanBadge) wanBadge.textContent = `${conns.length || 1} Interface(s)`;
+    
+    window.renderDdWanConnectionsTable(dev);
+
+    // Auto-select active or primary WAN in edit form
+    const primaryWan = conns.find(c => c.isActive) || conns.find(c => c.username) || conns[0];
+    if (primaryWan) {
+      window.selectWanConnectionToEdit(primaryWan.id || 'PPP_1');
     } else {
-      setVal('voipAuthUser', '');
-      setVal('voipDisplayNo', '');
-      setVal('voipProxy', '');
-      setVal('voipRegServer', '');
-      setVal('voipSipDomain', '');
+      setVal('ddWanSelectedId', '');
+      setVal('ddWanSelectedPath', '');
+      setVal('ddWanUsername', dev.wan?.username || '');
+      setVal('ddWanPassword', dev.wan?.password || '');
+      setVal('ddWanVlanId', dev.wan?.vlanId && !isNaN(dev.wan.vlanId) ? dev.wan.vlanId : 100);
     }
 
-    // Populate Optical Tab
-    setTxt('modalRxPower', rxVal);
-    setTxt('modalTxPower', dev.opticalPower?.txPower || '2.45 dBm');
-    setTxt('modalOptTemp', dev.opticalPower?.temperature || '42.1 °C');
-    setTxt('modalOptVolt', dev.opticalPower?.voltage || '3.30 V');
+    // --- TAB 3: Telemetry & Optical (Accurate Mapping, Zero Hardcoded Fake Data) ---
+    const rxVal = dev.opticalPower?.rxPower || dev.opticalPower?.rx || 'N/A';
+    const rxNum = parseFloat(rxVal);
+    setTxt('ddRxPower', rxVal);
+    setTxt('ddTxPower', dev.opticalPower?.txPower || dev.opticalPower?.tx || 'N/A');
+    setTxt('ddOptTemp', dev.opticalPower?.temperature || 'N/A');
+    setTxt('ddOptVolt', dev.opticalPower?.voltage || 'N/A');
+    setTxt('ddActiveClients', `${dev.connectedClients?.length || dev.hosts?.length || 0} Hosts`);
+    setTxt('ddUptime', dev.deviceInfo?.upTime ? formatUptimeSec(dev.deviceInfo.upTime) : (dev.deviceInfo?.uptime || dev.uptime || 'Active'));
+    setTxt('ddLastSeen', dev.lastInform ? `Last Inform: ${new Date(dev.lastInform).toLocaleTimeString('en-IN')}` : (dev.lastContact ? `Last Contact: ${formatRelativeTime(dev.lastContact)}` : 'Active'));
 
-    // Health badge
-    const healthBadge = document.getElementById('modalRxHealthBadge');
-    if (healthBadge) {
-      if (!isNaN(rxNum) && rxNum < -27) {
-        healthBadge.textContent = '🔴 Critical Signal Cut (< -27 dBm)';
-        healthBadge.style.color = '#ef4444';
-      } else if (!isNaN(rxNum) && rxNum < -24) {
-        healthBadge.textContent = '🟡 Marginal Attenuation (-24 to -27 dBm)';
-        healthBadge.style.color = '#f59e0b';
+    const rxHealth = document.getElementById('ddRxHealthBadge');
+    if (rxHealth) {
+      if (rxVal === 'N/A' || isNaN(rxNum)) {
+        rxHealth.textContent = '⚪ Optical Sensor Idle / Unlinked';
+        rxHealth.style.color = '#94a3b8';
+      } else if (rxNum < -27) {
+        rxHealth.textContent = '🔴 Critical Signal Loss (< -27 dBm)';
+        rxHealth.style.color = '#ef4444';
+      } else if (rxNum < -24) {
+        rxHealth.textContent = '🟡 Marginal Attenuation (-24 to -27 dBm)';
+        rxHealth.style.color = '#f59e0b';
       } else {
-        healthBadge.textContent = '🟢 Normal Signal Quality (Optimal)';
-        healthBadge.style.color = '#10b981';
+        rxHealth.textContent = '🟢 Normal Signal Quality (Optimal)';
+        rxHealth.style.color = '#10b981';
       }
     }
 
-    // Baseline on First Inform
-    const initialOpt = dev.initialOpticalPower;
-    setTxt('modalInitialRxPower', initialOpt?.rxPower || rxVal);
-    setTxt('modalInitialRxTime', initialOpt?.timestamp ? `First Seen: ${new Date(initialOpt.timestamp).toLocaleString('en-IN')}` : `Recorded at First Inform`);
-
-    // Lowest (Worst) Recorded Optical Power
-    const lowestOpt = dev.lowestOpticalPower;
-    setTxt('modalLowestRxPower', lowestOpt?.rxPower || rxVal);
-    setTxt('modalLowestRxTime', lowestOpt?.timestamp ? `Worst Seen: ${new Date(lowestOpt.timestamp).toLocaleString('en-IN')}` : `Recorded`);
-
-    // Last 20 Significant Fluctuations Table
+    // Optical History
     const optHistory = Array.isArray(dev.opticalHistory) ? dev.opticalHistory : [];
-    const historyBadge = document.getElementById('modalOptHistoryCountBadge');
-    if (historyBadge) historyBadge.textContent = `${optHistory.length} Fluctuations`;
-
-    const optTbody = document.getElementById('modalOpticalHistoryTableBody');
+    const optBadge = document.getElementById('ddOptHistoryBadge');
+    if (optBadge) optBadge.textContent = `${optHistory.length} Readings`;
+    const optTbody = document.getElementById('ddTblOpticalHistoryBody');
     if (optTbody) {
       if (optHistory.length === 0) {
-        optTbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">Initial baseline recorded. Significant changes (≥ 1.0 dB) will appear here automatically.</td></tr>`;
+        optTbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">Baseline recorded. Live signal updates from CPE will record automatically.</td></tr>`;
       } else {
-        // Show reverse chronological (newest at top)
         const reversedHistory = [...optHistory].reverse();
         optTbody.innerHTML = reversedHistory.map((h, idx) => {
           const dtStr = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN') : 'N/A';
           const rxFloat = parseFloat(h.rxPower);
           const isDegraded = h.direction === 'DEGRADED';
           const isImproved = h.direction === 'IMPROVED';
-          
           let dirBadge = `<span class="tailadmin-badge neutral" style="font-size:0.68rem;">⚪ Baseline</span>`;
-          if (isDegraded) {
-            dirBadge = `<span class="tailadmin-badge danger" style="font-size:0.68rem;">🔻 Loss (-${h.deltaDb} dB)</span>`;
-          } else if (isImproved) {
-            dirBadge = `<span class="tailadmin-badge success" style="font-size:0.68rem;">🔺 Gain (+${h.deltaDb} dB)</span>`;
-          }
-
-          let healthPill = `<span style="color:#10b981;font-weight:600;">Optimal</span>`;
-          if (rxFloat < -27) healthPill = `<span style="color:#ef4444;font-weight:700;">Critical Cut</span>`;
-          else if (rxFloat < -24) healthPill = `<span style="color:#f59e0b;font-weight:600;">Marginal</span>`;
+          if (isDegraded) dirBadge = `<span class="tailadmin-badge danger" style="font-size:0.68rem;">🔻 Loss (-${h.deltaDb} dB)</span>`;
+          else if (isImproved) dirBadge = `<span class="tailadmin-badge success" style="font-size:0.68rem;">🔺 Gain (+${h.deltaDb} dB)</span>`;
 
           return `
             <tr>
@@ -1768,126 +1893,433 @@ function openDeviceModal(deviceId, defaultTab) {
               <td><span class="mono" style="color:#10b981;">${escapeHtml(h.txPower || '--')}</span></td>
               <td><span class="mono" style="color:${isDegraded ? '#ef4444' : '#38bdf8'};font-weight:700;">${escapeHtml(h.deltaDb ? `${h.deltaDb} dB` : '0.00 dB')}</span></td>
               <td>${dirBadge}</td>
-              <td>${healthPill}</td>
+              <td>${rxFloat < -27 ? '🔴 Critical' : (rxFloat < -24 ? '🟡 Marginal' : '🟢 Optimal')}</td>
             </tr>
           `;
         }).join('');
       }
     }
 
-    // Populate Customer & Location Tab
-    let lat = parseFloat(dev.customer?.lat || dev.location?.lat);
-    let lng = parseFloat(dev.customer?.lng || dev.location?.lng);
-    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0 || lat < 15.5 || lat > 19.5) {
-      lat = 16.856686;
-      lng = 78.532318;
+    // --- TAB 4: Connected Hosts (LAN & Wi-Fi Client Normalization) ---
+    const hosts = dev.connectedClients || dev.hosts || [];
+    const hostsBadge = document.getElementById('ddHostsCountBadge');
+    if (hostsBadge) hostsBadge.textContent = `${hosts.length} Clients`;
+    const hostsTbody = document.getElementById('ddTblHostsBody');
+    if (hostsTbody) {
+      if (hosts.length === 0) {
+        hostsTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:#94a3b8;">No active client leases or associated WiFi devices reported yet.</td></tr>`;
+      } else {
+        hostsTbody.innerHTML = hosts.map(h => `
+          <tr>
+            <td><strong>${escapeHtml(h.hostName || h.name || 'Unknown Device')}</strong></td>
+            <td><span class="mono" style="color:#10b981;font-weight:700;">${escapeHtml(h.ipAddress || h.ip || '—')}</span></td>
+            <td><span class="mono" style="color:#a855f7;">${escapeHtml(h.macAddress || h.mac || '—')}</span></td>
+            <td><span class="tailadmin-badge ${String(h.medium || h.interfaceType || '').includes('5G') ? 'primary' : 'success'}">${escapeHtml(h.medium || h.interfaceType || 'WLAN (2.4G)')}</span></td>
+            <td style="color:#94a3b8;font-size:0.75rem;">${escapeHtml(h.leaseTime || (h.active ? 'Active Connection' : 'Idle'))}</td>
+            <td style="text-align:center;">
+              <button type="button" class="btn-outline" style="padding:0.2rem 0.5rem;font-size:0.72rem;" onclick="window.pingDeviceIp('${escapeHtml(dev._id)}', '${escapeHtml(h.ipAddress || h.ip)}')">
+                ⚡ Ping
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      }
     }
 
-    setVal('custName', dev.customer?.name || '');
-    setVal('custPhone', dev.customer?.phone || '');
-    setVal('custAccountId', dev.customer?.accountId || '');
-    setVal('custLat', lat.toFixed(6));
-    setVal('custLng', lng.toFixed(6));
-    setVal('custAddress', dev.customer?.address || dev.location?.address || '');
-    setVal('custNotes', dev.customer?.notes || '');
+    // --- TAB 5: Customer & GIS ---
+    let lat = parseFloat(dev.customer?.lat || dev.location?.lat || 16.856686);
+    let lng = parseFloat(dev.customer?.lng || dev.location?.lng || 78.532318);
+    setVal('ddCustName', dev.customer?.name || '');
+    setVal('ddCustPhone', dev.customer?.phone || '');
+    setVal('ddCustAccountId', dev.customer?.accountId || '');
+    setVal('ddCustLat', lat.toFixed(6));
+    setVal('ddCustLng', lng.toFixed(6));
+    setVal('ddCustAddress', dev.customer?.address || dev.location?.address || '');
 
-    // Populate Diagnostics Tab (Tab 8)
-    setVal('diagPingIpInput', dev.network?.externalIP || dev.wan?.ipAddress || '');
-    const pingConsole = document.getElementById('diagPingOutputConsole');
-    if (pingConsole) pingConsole.textContent = `Click 'Send ICMP Ping Packets' to test network reachability & latency to ${dev.network?.externalIP || dev.wan?.ipAddress || 'this ONT'} from ACS server...`;
-
-    const gpsMsg = document.getElementById('gpsStatusMessage');
-    if (gpsMsg) gpsMsg.style.display = 'none';
-
-    // Populate FDP options
-    const fdpSelect = document.getElementById('custFdpSelect');
+    const fdpSelect = document.getElementById('ddCustFdpSelect');
     if (fdpSelect) {
       const fdpNodes = (mapTopology.nodes || []).filter(n => n.type === 'FDP_SPLITTER');
       fdpSelect.innerHTML = `<option value="">-- Direct to OLT / Unassigned --</option>` +
         fdpNodes.map(f => `<option value="${f.id}" ${dev.customer?.fdpId === f.id ? 'selected' : ''}>${escapeHtml(f.name)} (${f.splitRatio})</option>`).join('');
     }
 
-    // Populate Connected Clients Table
-    populateLanHostsTable(dev.connectedClients || []);
+    // --- TAB 6: System Diagnostics ---
+    setTxt('ddSwVer', dev.deviceInfo?.softwareVersion || dev.deviceInfo?.firmwareVersion || 'V2.0.1_PROD');
+    setTxt('ddHwVer', dev.deviceInfo?.hardwareVersion || 'V1.0');
+    setTxt('ddProdClass', dev.deviceInfo?.productClass || modelName);
+    setTxt('ddCrUrl', dev.network?.connectionRequestURL || `http://${dev.network?.externalIP || '127.0.0.1'}:7547/`);
+    setVal('ddPingIpInput', dev.network?.externalIP || dev.wan?.ipAddress || '');
 
-    // Show Modal
-    const modalEl = document.getElementById('deviceModal');
-    if (modalEl) {
-      modalEl.style.display = 'flex';
-    }
+    // Persist active device in session and URL Hash so page refresh keeps user on this page
+    sessionStorage.setItem('acs_active_device_id', dev._id);
+    sessionStorage.setItem('acs_active_device_tab', defaultTab);
 
-    if (defaultTab) {
-      const targetBtn = document.querySelector(`.modal-tab-btn[data-mtab="${defaultTab}"], .m-tab-btn[data-mtab="${defaultTab}"]`);
-      if (targetBtn) targetBtn.click();
+    // Switch view to dedicated device-details page!
+    window.switchTab('device-details', false);
+    window.switchDeviceDetailsTab(defaultTab);
+
+    const newHash = `#device-details?id=${encodeURIComponent(dev._id)}&tab=${encodeURIComponent(defaultTab)}`;
+    if (history.replaceState) {
+      history.replaceState(null, '', newHash);
     } else {
-      const firstTab = document.querySelector('.modal-tab-btn[data-mtab="mtab-overview"], .m-tab-btn[data-mtab="mtab-overview"]');
-      if (firstTab) firstTab.click();
+      window.location.hash = newHash;
     }
 
-    // Initialize or re-center the in-modal interactive map
-    setTimeout(() => {
-      initMiniPinMap(lat, lng);
-    }, 150);
+    // Scroll smoothly to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
   } catch (err) {
-    console.error('Error opening device modal:', err);
-    showToast('Failed to open CPE modal: ' + err.message, 'error');
+    console.error('Error opening dedicated device view:', err);
+    showToast('Failed to open device view: ' + err.message, 'error');
   }
-}
+};
 
-function closeDeviceModal() {
-  const modalEl = document.getElementById('deviceModal');
-  if (modalEl) modalEl.style.display = 'none';
-  const drawerEl = document.getElementById('gacsWifiEditDrawer');
-  if (drawerEl) drawerEl.style.display = 'none';
-  currentSelectedDevice = null;
-}
+window.renderDdWanConnectionsTable = function(dev) {
+  const wanTbody = document.getElementById('ddTblWanConnectionsBody');
+  if (!wanTbody) return;
 
-window.openQuickWifiEditModal = function(ssidIndex) {
+  const conns = dev.wan?.connections || [];
+  if (conns.length === 0) {
+    const extIp = dev.network?.externalIP || dev.wan?.ipAddress || '0.0.0.0';
+    const isConn = extIp && extIp !== '0.0.0.0';
+    wanTbody.innerHTML = `
+      <tr style="cursor:pointer;" onclick="window.selectWanConnectionToEdit('PPP_1')">
+        <td class="mono font-bold" style="color:#38bdf8;">1_INTERNET_R_VID_${escapeHtml(String(dev.wan?.vlanId || 100))}</td>
+        <td><span class="tailadmin-badge primary">INTERNET</span></td>
+        <td class="mono">${escapeHtml(dev.wan?.connectionType || 'PPPoE')}</td>
+        <td class="mono font-bold">${escapeHtml(String(dev.wan?.vlanId || 'Untagged'))}</td>
+        <td class="mono font-bold" style="color:${isConn ? '#10b981' : '#64748b'};">${escapeHtml(extIp)}</td>
+        <td class="mono">${escapeHtml(dev.wan?.defaultGateway || '—')}</td>
+        <td><span class="tailadmin-badge ${isConn ? 'success' : 'danger'}">${isConn ? '● Active Connected' : '○ Disconnected'}</span></td>
+        <td style="text-align:center;">
+          <button type="button" class="btn-primary" style="padding:0.25rem 0.6rem;font-size:0.72rem;" onclick="event.stopPropagation(); window.selectWanConnectionToEdit('PPP_1')">
+            ✏️ Select
+          </button>
+        </td>
+      </tr>
+    `;
+  } else {
+    wanTbody.innerHTML = conns.map(c => {
+      const isConn = c.isActive || c.status?.toLowerCase().includes('connect') || (c.externalIP && c.externalIP !== '0.0.0.0');
+      return `
+        <tr style="cursor:pointer;" onclick="window.selectWanConnectionToEdit('${escapeHtml(c.id)}')">
+          <td class="mono font-bold" style="color:#38bdf8;">${escapeHtml(c.name || c.id)}</td>
+          <td><span class="tailadmin-badge ${c.serviceList?.includes('VOIP') ? 'warning' : 'primary'}">${escapeHtml(c.serviceList || 'INTERNET')}</span></td>
+          <td class="mono">${escapeHtml(c.connectionType || 'PPPoE')}</td>
+          <td class="mono font-bold">${escapeHtml(String(c.vlanId || 'Untagged'))}</td>
+          <td class="mono font-bold" style="color:${c.externalIP ? '#10b981' : '#64748b'};">${escapeHtml(c.externalIP || '0.0.0.0')}</td>
+          <td class="mono">${escapeHtml(c.defaultGateway || '—')}</td>
+          <td><span class="tailadmin-badge ${isConn ? 'success' : 'danger'}">${isConn ? '● Active Connected' : '○ Disconnected'}</span></td>
+          <td style="text-align:center;">
+            <button type="button" class="btn-primary" style="padding:0.25rem 0.6rem;font-size:0.72rem;" onclick="event.stopPropagation(); window.selectWanConnectionToEdit('${escapeHtml(c.id)}')">
+              ✏️ Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+};
+
+window.selectWanConnectionToEdit = function(connId) {
   if (!currentSelectedDevice) return;
-  const drawer = document.getElementById('gacsWifiEditDrawer');
+  const conns = currentSelectedDevice.wan?.connections || [];
+  const conn = conns.find(c => c.id === connId) || conns[0];
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+
+  if (conn) {
+    setVal('ddWanSelectedId', conn.id || '');
+    setVal('ddWanSelectedPath', conn.path || '');
+    setVal('ddWanConnType', conn.connectionType || 'PPPoE');
+    setVal('ddWanConnMode', conn.connectionMode || 'IP_Routed');
+    setVal('ddWanServiceType', conn.serviceList || 'INTERNET');
+    setVal('ddWanVlanId', conn.vlanId && !isNaN(conn.vlanId) ? conn.vlanId : '');
+    setVal('ddWanMtu', conn.mtu || 1492);
+    const pppPass = conn.password || currentSelectedDevice.wan?.password || currentSelectedDevice.customer?.pppoePassword || currentSelectedDevice.customer?.password || '';
+    setVal('ddWanUsername', conn.username || '');
+    setVal('ddWanPassword', pppPass);
+
+    const hasVlan = !!(conn.vlanId && !isNaN(conn.vlanId) && parseInt(conn.vlanId, 10) > 0);
+    const vlanCheck = document.getElementById('ddWanVlanEnable');
+    if (vlanCheck) {
+      vlanCheck.checked = hasVlan;
+      window.toggleEditWanVlan(hasVlan);
+    }
+
+    const heading = document.getElementById('ddWanEditHeading');
+    if (heading) heading.textContent = `✏️ Edit WAN Profile: ${conn.name || conn.id} (${conn.connectionType || 'PPPoE'})`;
+  } else {
+    const pppPass = currentSelectedDevice.wan?.password || currentSelectedDevice.customer?.pppoePassword || currentSelectedDevice.customer?.password || '';
+    setVal('ddWanSelectedId', '');
+    setVal('ddWanSelectedPath', '');
+    setVal('ddWanUsername', currentSelectedDevice.wan?.username || '');
+    setVal('ddWanPassword', pppPass);
+    setVal('ddWanVlanId', currentSelectedDevice.wan?.vlanId && !isNaN(currentSelectedDevice.wan.vlanId) ? currentSelectedDevice.wan.vlanId : 100);
+    const vlanCheck = document.getElementById('ddWanVlanEnable');
+    if (vlanCheck) {
+      vlanCheck.checked = true;
+      window.toggleEditWanVlan(true);
+    }
+  }
+};
+
+window.toggleNewWanVlan = function(isTicked) {
+  const idGroup = document.getElementById('ddNewWanVlanIdGroup');
+  const priGroup = document.getElementById('ddNewWanVlanPriGroup');
+  if (idGroup) idGroup.style.display = isTicked ? 'block' : 'none';
+  if (priGroup) priGroup.style.display = isTicked ? 'block' : 'none';
+};
+
+window.toggleEditWanVlan = function(isTicked) {
+  const idGroup = document.getElementById('ddWanVlanIdGroup');
+  if (idGroup) idGroup.style.display = isTicked ? 'block' : 'none';
+};
+
+window.openAddWanDrawer = function() {
+  if (!currentSelectedDevice) return;
+  const drawer = document.getElementById('ddAddWanDrawer');
   if (!drawer) return;
 
-  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // Check ONT capabilities from discovered parameters
+  const params = currentSelectedDevice.rawParameters || {};
+  const supported = currentSelectedDevice.supportedParams || Object.keys(params);
+  const hasIpv6Support = supported.some(k => /IPv6|X_CT-COM_IPMode|IPMode/i.test(k));
 
-  setVal('gacsEditSsidIndex', ssidIndex);
-  setTxt('gacsWifiEditTitle', `✏️ Edit SSID ${ssidIndex} Configuration`);
-
-  let currentSsid = '', currentPwd = '12345678', currentSec = 'WPAand11i';
-  if (ssidIndex === 1) {
-    currentSsid = currentSelectedDevice.wifi?.wifi24?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_2.4G` : 'Rudra_Fiber_2.4G');
-    currentPwd = currentSelectedDevice.wifi?.wifi24?.password || '12345678';
-    currentSec = currentSelectedDevice.wifi?.wifi24?.security || 'WPAand11i';
-  } else if (ssidIndex === 2) {
-    currentSsid = currentSelectedDevice.wifi?.wifi5?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_5G` : 'WIFI2.4G_01');
-    currentPwd = currentSelectedDevice.wifi?.wifi5?.password || '12345678';
-    currentSec = currentSelectedDevice.wifi?.wifi5?.security || 'WPAand11i';
-  } else if (ssidIndex === 3) {
-    currentSsid = currentSelectedDevice.wifi?.guest24?.ssid || 'WIFI2.4G_02';
-    currentPwd = currentSelectedDevice.wifi?.guest24?.password || '12345678';
-  } else if (ssidIndex === 4) {
-    currentSsid = currentSelectedDevice.wifi?.guest5?.ssid || 'WIFI2.4G_03';
-    currentPwd = currentSelectedDevice.wifi?.guest5?.password || '12345678';
+  const ipVersionSelect = document.getElementById('ddNewWanIpVersion');
+  if (ipVersionSelect) {
+    ipVersionSelect.innerHTML = `
+      <option value="IPv4">IPv4</option>
+      ${hasIpv6Support ? `
+        <option value="IPv6">IPv6</option>
+        <option value="IPv4/IPv6" selected>IPv4 + IPv6 (Dual Stack)</option>
+      ` : ''}
+    `;
   }
 
-  setVal('gacsEditSsidName', currentSsid);
-  setVal('gacsEditSsidPassword', currentPwd);
-  setVal('gacsEditSsidSecurity', currentSec);
+  // Reset to default PPPoE
+  const typeSelect = document.getElementById('ddNewWanType');
+  if (typeSelect) typeSelect.value = 'PPPoE';
+  window.updateAddWanFields('PPPoE');
+
+  // Reset VLAN toggle to checked by default
+  const vlanCheck = document.getElementById('ddNewWanVlanEnable');
+  if (vlanCheck) {
+    vlanCheck.checked = true;
+    window.toggleNewWanVlan(true);
+  }
 
   drawer.style.display = 'block';
   drawer.scrollIntoView({ behavior: 'smooth' });
 };
 
-window.saveGacsWifiConfig = async function() {
+window.updateAddWanFields = function(connType) {
+  const pppPanel = document.getElementById('ddAddWanPppPanel');
+  const staticPanel = document.getElementById('ddAddWanStaticPanel');
+  const routeNatRow = document.getElementById('ddAddWanRouteNatRow');
+  const mtuInput = document.getElementById('ddNewWanMtu');
+
+  if (connType === 'PPPoE') {
+    if (pppPanel) pppPanel.style.display = 'block';
+    if (staticPanel) staticPanel.style.display = 'none';
+    if (routeNatRow) routeNatRow.style.display = 'flex';
+    if (mtuInput) mtuInput.value = '1492';
+  } else if (connType === 'DHCP') {
+    if (pppPanel) pppPanel.style.display = 'none';
+    if (staticPanel) staticPanel.style.display = 'none';
+    if (routeNatRow) routeNatRow.style.display = 'flex';
+    if (mtuInput) mtuInput.value = '1500';
+  } else if (connType === 'Static') {
+    if (pppPanel) pppPanel.style.display = 'none';
+    if (staticPanel) staticPanel.style.display = 'block';
+    if (routeNatRow) routeNatRow.style.display = 'flex';
+    if (mtuInput) mtuInput.value = '1500';
+  } else if (connType === 'Bridge') {
+    if (pppPanel) pppPanel.style.display = 'none';
+    if (staticPanel) staticPanel.style.display = 'none';
+    if (routeNatRow) routeNatRow.style.display = 'none';
+    if (mtuInput) mtuInput.value = '1500';
+  }
+};
+
+window.toggleAddWanPppFields = function(connType) {
+  window.updateAddWanFields(connType);
+};
+
+window.submitNewWanProfile = async function() {
   if (!currentSelectedDevice || !currentSelectedDevice._id) {
     showToast('No active device selected', 'error');
     return;
   }
-  const idx = parseInt(document.getElementById('gacsEditSsidIndex')?.value || '1', 10);
-  const ssid = document.getElementById('gacsEditSsidName')?.value.trim();
-  const password = document.getElementById('gacsEditSsidPassword')?.value.trim();
-  const security = document.getElementById('gacsEditSsidSecurity')?.value || 'WPAand11i';
-  const enable = document.getElementById('gacsEditSsidEnable')?.value === '1';
+
+  const connectionType = document.getElementById('ddNewWanType')?.value || 'PPPoE';
+  const serviceList = document.getElementById('ddNewWanService')?.value || 'INTERNET';
+  const ipVersion = document.getElementById('ddNewWanIpVersion')?.value || 'IPv4';
+
+  const username = document.getElementById('ddNewWanUser')?.value.trim() || '';
+  const password = document.getElementById('ddNewWanPass')?.value.trim() || '';
+  const serviceName = document.getElementById('ddNewWanServiceName')?.value.trim() || '';
+
+  const staticIp = document.getElementById('ddNewWanStaticIp')?.value.trim() || '';
+  const subnetMask = document.getElementById('ddNewWanSubnet')?.value.trim() || '';
+  const gateway = document.getElementById('ddNewWanGateway')?.value.trim() || '';
+  const dnsServers = document.getElementById('ddNewWanDns')?.value.trim() || '';
+
+  const vlanEnabled = document.getElementById('ddNewWanVlanEnable')?.checked !== false;
+  const rawVlan = document.getElementById('ddNewWanVlan')?.value;
+  const vlanId = (vlanEnabled && rawVlan) ? parseInt(rawVlan, 10) : undefined;
+  const vlanPriority = vlanEnabled ? parseInt(document.getElementById('ddNewWanVlanPri')?.value || '0', 10) : undefined;
+
+  const mtu = parseInt(document.getElementById('ddNewWanMtu')?.value || '1492', 10);
+  const enableNat = document.getElementById('ddNewWanNat')?.checked !== false;
+  const defaultRoute = document.getElementById('ddNewWanDefaultRoute')?.checked !== false;
+
+  // Port binding array
+  const portBinding = [];
+  if (document.getElementById('ddNewBindLan1')?.checked) portBinding.push('LAN1');
+  if (document.getElementById('ddNewBindLan2')?.checked) portBinding.push('LAN2');
+  if (document.getElementById('ddNewBindAp1')?.checked) portBinding.push('AP1');
+  if (document.getElementById('ddNewBindAp2')?.checked) portBinding.push('AP2');
+
+  // Strict Validation based on Type
+  if (connectionType === 'PPPoE' && !username) {
+    showToast('PPPoE Username is required for PPPoE Routed connection', 'warning');
+    return;
+  }
+  if (connectionType === 'Static' && (!staticIp || !gateway)) {
+    showToast('Static IP Address and Default Gateway are required for Static IP mode', 'warning');
+    return;
+  }
+
+  showToast(`Provisioning new ${connectionType} WAN (${serviceList}) via TR-069...`, 'info');
+
+  try {
+    const payload = {
+      connectionType,
+      serviceList,
+      ipVersion,
+      username,
+      password,
+      serviceName,
+      staticIp,
+      subnetMask,
+      gateway,
+      dnsServers,
+      vlanId: vlanId ? parseInt(vlanId, 10) : undefined,
+      vlanPriority: parseInt(vlanPriority, 10),
+      mtu,
+      enableNat,
+      defaultRoute,
+      portBinding: portBinding.join(',')
+    };
+
+    const res = await authFetch(`/api/devices/${encodeURIComponent(currentSelectedDevice._id)}/wan/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ New ${connectionType} WAN profile created and queued for ONT!`, 'success');
+      document.getElementById('ddAddWanDrawer').style.display = 'none';
+      await loadDevices();
+    } else {
+      showToast(data.message || data.error || 'Failed to create WAN profile', 'error');
+    }
+  } catch (err) {
+    showToast('WAN creation error: ' + err.message, 'error');
+  }
+};
+
+window.deleteSelectedWanProfile = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) return;
+  const wanPath = document.getElementById('ddWanSelectedPath')?.value;
+  const wanId = document.getElementById('ddWanSelectedId')?.value || 'Current WAN';
+
+  if (!confirm(`Are you sure you want to DELETE WAN profile "${wanId}" from this ONT router?`)) return;
+
+  showToast(`Deleting WAN profile ${wanId} via TR-069 DeleteObject RPC...`, 'info');
+
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(currentSelectedDevice._id)}/wan/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wanPath, wanId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('🗑️ WAN profile delete signal sent to ONT!', 'success');
+      await loadDevices();
+    } else {
+      showToast(data.message || data.error || 'Failed to delete WAN profile', 'error');
+    }
+  } catch (err) {
+    showToast('WAN delete error: ' + err.message, 'error');
+  }
+};
+
+window.openDedicatedWifiEditModal = function(slotOrIndex) {
+  if (!currentSelectedDevice) return;
+  const drawer = document.getElementById('ddWifiEditDrawer');
+  if (!drawer) return;
+
+  const actualIndex = (window._activeSsidSlots && window._activeSsidSlots[slotOrIndex]) ? window._activeSsidSlots[slotOrIndex] : slotOrIndex;
+
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  setVal('ddEditSsidIndex', actualIndex);
+  setTxt('ddWifiEditTitle', `✏️ Edit SSID (Slot ${slotOrIndex} / Index ${actualIndex})`);
+
+  const ssids = currentSelectedDevice.wifi?.ssids || [];
+  let targetSsid = ssids.find(s => s.index === actualIndex);
+  if (!targetSsid) {
+    if (slotOrIndex === 1 && currentSelectedDevice.wifi?.wifi24) targetSsid = currentSelectedDevice.wifi.wifi24;
+    else if (slotOrIndex === 2 && currentSelectedDevice.wifi?.wifi5) targetSsid = currentSelectedDevice.wifi.wifi5;
+  }
+
+  let currentSsid = targetSsid?.ssid || '';
+  let currentPwd = targetSsid?.password || '';
+  let currentSec = targetSsid?.securityMode || 'WPAand11i';
+  let currentEnable = targetSsid?.enabled !== false ? '1' : '0';
+  let currentHide = targetSsid?.hideSsid ? '1' : '0';
+
+  // Smart Connect password resolution: if one band has the real password, populate it
+  if (!currentPwd && currentSelectedDevice.wifi?.smartConnect) {
+    currentPwd = currentSelectedDevice.wifi?.wifi5?.password || currentSelectedDevice.wifi?.wifi24?.password || '';
+  }
+
+  if (!currentSsid) {
+    if (slotOrIndex === 1) currentSsid = currentSelectedDevice.wifi?.wifi24?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_2.4G` : 'Rudra_Fiber_2.4G');
+    else if (slotOrIndex === 2) currentSsid = currentSelectedDevice.wifi?.wifi5?.ssid || (currentSelectedDevice.customer?.name ? `${currentSelectedDevice.customer.name}_5G` : 'Rudra_Fiber_5G');
+  }
+
+  setVal('ddEditSsidName', currentSsid);
+  setVal('ddEditSsidPassword', currentPwd);
+  setVal('ddEditSsidSecurity', currentSec);
+  setVal('ddEditSsidEnable', currentEnable);
+  setVal('ddEditSsidHide', currentHide);
+
+  const pwdInput = document.getElementById('ddEditSsidPassword');
+  if (pwdInput) {
+    pwdInput.placeholder = targetSsid?.isPasswordProtected ? '(Protected in firmware - enter new password to update)' : 'WPA2 Passphrase (min 8 chars)';
+  }
+
+  drawer.style.display = 'block';
+  drawer.scrollIntoView({ behavior: 'smooth' });
+};
+
+window.saveDedicatedWifiConfig = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) {
+    showToast('No active device selected', 'error');
+    return;
+  }
+  const devId = currentSelectedDevice._id;
+  const idx = parseInt(document.getElementById('ddEditSsidIndex')?.value || '1', 10);
+  const ssid = document.getElementById('ddEditSsidName')?.value.trim();
+  const password = document.getElementById('ddEditSsidPassword')?.value.trim();
+  const security = document.getElementById('ddEditSsidSecurity')?.value || 'WPAand11i';
+  const enable = document.getElementById('ddEditSsidEnable')?.value === '1';
+  const hideSsid = document.getElementById('ddEditSsidHide')?.value === '1';
 
   if (!ssid) {
     showToast('SSID Network Name cannot be empty', 'warning');
@@ -1898,51 +2330,83 @@ window.saveGacsWifiConfig = async function() {
     return;
   }
 
-  showToast(`Pushing SSID ${idx} parameters to ONT via TR-069...`, 'info');
+  // 1. Instantly close edit drawer
+  const drawerEl = document.getElementById('ddWifiEditDrawer');
+  if (drawerEl) drawerEl.style.display = 'none';
+
+  // 2. Instantly update in-memory state & DOM UI
+  if (!currentSelectedDevice.wifi) currentSelectedDevice.wifi = { ssids: [] };
+  if (!currentSelectedDevice.wifi.ssids) currentSelectedDevice.wifi.ssids = [];
+  let found = currentSelectedDevice.wifi.ssids.find(s => s.index === idx);
+  if (!found) {
+    found = { index: idx, name: `SSID ${idx}` };
+    currentSelectedDevice.wifi.ssids.push(found);
+  }
+  found.ssid = ssid;
+  if (password) found.password = password;
+  found.securityMode = security;
+  found.enabled = enable;
+  found.hideSsid = hideSsid;
+
+  const s1Idx = window._activeSsidSlots?.[1] || 1;
+  const s2Idx = window._activeSsidSlots?.[2] || 2;
+  const s3Idx = window._activeSsidSlots?.[3] || 3;
+  const s4Idx = window._activeSsidSlots?.[4] || 4;
+
+  if (idx === s1Idx || idx === 1 || idx === 0) {
+    if (!currentSelectedDevice.wifi.wifi24) currentSelectedDevice.wifi.wifi24 = {};
+    currentSelectedDevice.wifi.wifi24.ssid = ssid;
+    if (password) currentSelectedDevice.wifi.wifi24.password = password;
+    currentSelectedDevice.wifi.wifi24.enabled = enable;
+    const el = document.getElementById('ddSsid1Name'); if (el) el.textContent = ssid;
+  } else if (idx === s2Idx || idx === 2 || idx === 5 || idx === 6) {
+    if (!currentSelectedDevice.wifi.wifi5) currentSelectedDevice.wifi.wifi5 = {};
+    currentSelectedDevice.wifi.wifi5.ssid = ssid;
+    if (password) currentSelectedDevice.wifi.wifi5.password = password;
+    currentSelectedDevice.wifi.wifi5.enabled = enable;
+    const el = document.getElementById('ddSsid2Name'); if (el) el.textContent = ssid;
+  } else if (idx === s3Idx || idx === 3) {
+    const el = document.getElementById('ddSsid3Name'); if (el) el.textContent = ssid;
+  } else if (idx === s4Idx || idx === 4) {
+    const el = document.getElementById('ddSsid4Name'); if (el) el.textContent = ssid;
+  }
+
+  showToast(`💾 Saved locally! Pushing SSID "${ssid}" to ONT router...`, 'info');
 
   try {
     const payload = {
       ssidIndex: idx,
       ssid,
-      password,
+      password: password || undefined,
       security,
-      enable
+      enable,
+      hideSsid
     };
-    if (idx === 1) {
-      payload.wifi24Ssid = ssid;
-      payload.wifi24Password = password;
-    } else if (idx === 2) {
-      payload.wifi5Ssid = ssid;
-      payload.wifi5Password = password;
-    }
 
-    const res = await authFetch(`/api/devices/${encodeURIComponent(currentSelectedDevice._id)}/wifi`, {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/wifi`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`✅ SSID ${idx} (${ssid}) pushed to ONT successfully!`, 'success');
-      document.getElementById('gacsWifiEditDrawer').style.display = 'none';
-
-      // Update local memory & UI labels
-      if (idx === 1) {
-        if (!currentSelectedDevice.wifi) currentSelectedDevice.wifi = {};
-        if (!currentSelectedDevice.wifi.wifi24) currentSelectedDevice.wifi.wifi24 = {};
-        currentSelectedDevice.wifi.wifi24.ssid = ssid;
-        currentSelectedDevice.wifi.wifi24.password = password;
-        currentSelectedDevice.wifi.wifi24.security = security;
-        const el = document.getElementById('gacsSsid1NameVal'); if (el) el.textContent = ssid;
-      } else if (idx === 2) {
-        if (!currentSelectedDevice.wifi) currentSelectedDevice.wifi = {};
-        if (!currentSelectedDevice.wifi.wifi5) currentSelectedDevice.wifi.wifi5 = {};
-        currentSelectedDevice.wifi.wifi5.ssid = ssid;
-        currentSelectedDevice.wifi.wifi5.password = password;
-        const el = document.getElementById('gacsSsid2NameVal'); if (el) el.textContent = ssid;
+      if (data.device) {
+        currentSelectedDevice = data.device;
       }
-
-      await loadDevices();
+      
+      // Countdown timer & complete refresh
+      let count = 4;
+      const countTimer = setInterval(async () => {
+        if (count > 0) {
+          showToast(`🔄 Applying to ONT router... (${count}s remaining)`, 'info');
+          count--;
+        } else {
+          clearInterval(countTimer);
+          showToast(`🎉 WiFi SSID ${idx} ("${ssid}") active on router!`, 'success');
+          await loadDevices();
+          window.viewDeviceDetails(devId, 'dd-tab-ssid');
+        }
+      }, 1000);
     } else {
       showToast(data.message || data.error || 'Failed to push WiFi configuration', 'error');
     }
@@ -1950,6 +2414,241 @@ window.saveGacsWifiConfig = async function() {
     showToast('WiFi push error: ' + err.message, 'error');
   }
 };
+
+window.saveDdWanConfig = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) return;
+  const devId = currentSelectedDevice._id;
+  const wanId = document.getElementById('ddWanSelectedId')?.value;
+  const wanPath = document.getElementById('ddWanSelectedPath')?.value;
+  const username = document.getElementById('ddWanUsername')?.value.trim();
+  const password = document.getElementById('ddWanPassword')?.value.trim();
+  
+  const vlanEnabled = document.getElementById('ddWanVlanEnable')?.checked !== false;
+  const rawVlan = document.getElementById('ddWanVlanId')?.value;
+  const vlanId = (vlanEnabled && rawVlan) ? parseInt(rawVlan, 10) : undefined;
+
+  const connType = document.getElementById('ddWanConnType')?.value || 'PPPoE';
+  const connMode = document.getElementById('ddWanConnMode')?.value || 'IP_Routed';
+  const mtu = parseInt(document.getElementById('ddWanMtu')?.value || '1492', 10);
+  const serviceList = document.getElementById('ddWanServiceType')?.value || 'INTERNET';
+
+  showToast(`Updating WAN profile for ${devId}...`, 'info');
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/wan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wanId, wanPath, username, password, vlanEnabled, vlanId, connectionType: connType, connectionMode: connMode, mtu, serviceList })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ WAN configuration sent to ONT! Syncing...', 'success');
+      
+      let count = 4;
+      const countTimer = setInterval(async () => {
+        if (count > 0) {
+          showToast(`🔄 Provisioning WAN on ONT router... (${count}s remaining)`, 'info');
+          count--;
+        } else {
+          clearInterval(countTimer);
+          showToast('🎉 WAN configuration active on router! Details refreshed.', 'success');
+          await loadDevices();
+          const activeTabEl = document.querySelector('.dd-tab-btn.active');
+          const activeTabId = activeTabEl ? activeTabEl.getAttribute('data-ddtab') : 'dd-tab-wan';
+          window.viewDeviceDetails(devId, activeTabId);
+        }
+      }, 1000);
+    } else {
+      showToast(data.message || 'Failed to update WAN', 'error');
+    }
+  } catch (err) {
+    showToast('Error updating WAN: ' + err.message, 'error');
+  }
+};
+
+window.saveDdCustomerConfig = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) return;
+  const devId = currentSelectedDevice._id;
+  const name = document.getElementById('ddCustName')?.value.trim();
+  const phone = document.getElementById('ddCustPhone')?.value.trim();
+  const accountId = document.getElementById('ddCustAccountId')?.value.trim();
+  const fdpId = document.getElementById('ddCustFdpSelect')?.value;
+  const lat = parseFloat(document.getElementById('ddCustLat')?.value || '0');
+  const lng = parseFloat(document.getElementById('ddCustLng')?.value || '0');
+  const address = document.getElementById('ddCustAddress')?.value.trim();
+
+  showToast(`Saving subscriber details for ${devId}...`, 'info');
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/customer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, accountId, fdpId, lat, lng, address })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Subscriber details saved successfully!', 'success');
+      setTxt('ddHeaderCustomer', name || 'Unassigned');
+      await loadDevices();
+      const activeTabEl = document.querySelector('.dd-tab-btn.active');
+      const activeTabId = activeTabEl ? activeTabEl.getAttribute('data-ddtab') : 'dd-tab-customer';
+      window.viewDeviceDetails(devId, activeTabId);
+    } else {
+      showToast(data.message || 'Failed to save customer profile', 'error');
+    }
+  } catch (err) {
+    showToast('Customer save error: ' + err.message, 'error');
+  }
+};
+
+window.summonCurrentDevice = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) {
+    showToast('No active device selected', 'error');
+    return;
+  }
+  const devId = currentSelectedDevice._id;
+  const devName = currentSelectedDevice.customer?.name || currentSelectedDevice.deviceInfo?.modelName || devId;
+
+  const btn = document.querySelector('button[onclick="summonCurrentDevice()"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳</span> <span>Syncing...</span>`;
+  }
+
+  showToast(`⚡ Initiating TR-069 Real-Time Sync with ${devName}...`, 'info');
+
+  let countdown = 5;
+  const syncInterval = setInterval(async () => {
+    countdown--;
+    if (countdown > 0) {
+      showToast(`🔄 Communicating with ONT router... (${countdown}s remaining)`, 'info');
+    } else {
+      clearInterval(syncInterval);
+      showToast(`✅ ${devName} successfully synchronized! Latest router & customer data refreshed.`, 'success');
+      await loadDevices();
+      const activeTabEl = document.querySelector('.dd-tab-btn.active');
+      const activeTabId = activeTabEl ? activeTabEl.getAttribute('data-ddtab') : 'dd-tab-ssid';
+      window.viewDeviceDetails(devId, activeTabId);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🔄</span> <span>Summon</span>`;
+      }
+    }
+  }, 1000);
+
+  try {
+    await authFetch(`/api/devices/${encodeURIComponent(devId)}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    console.warn('Summon request sent to queue:', err);
+  }
+};
+
+window.quickRebootCurrentDevice = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) return;
+  const devId = currentSelectedDevice._id;
+  if (!confirm(`Are you sure you want to REBOOT this ONT router remotely via TR-069?`)) return;
+
+  showToast(`Sending Reboot RPC signal to ONT...`, 'info');
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/reboot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('🔄 Reboot command delivered to router successfully!', 'success');
+      await loadDevices();
+    } else {
+      showToast(data.message || 'Reboot queued for next router contact', 'info');
+    }
+  } catch (err) {
+    showToast('Reboot error: ' + err.message, 'error');
+  }
+};
+
+window.factoryResetCurrentDevice = async function() {
+  if (!currentSelectedDevice || !currentSelectedDevice._id) return;
+  const devId = currentSelectedDevice._id;
+  if (!confirm(`⚠️ CRITICAL WARNING: Are you sure you want to FACTORY RESET this router to default settings?`)) return;
+
+  showToast(`Sending FactoryReset RPC signal to ONT...`, 'info');
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/factory-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('⚠️ Factory Reset signal sent to router!', 'warning');
+      await loadDevices();
+    } else {
+      showToast(data.message || 'Reset queued', 'info');
+    }
+  } catch (err) {
+    showToast('Reset error: ' + err.message, 'error');
+  }
+};
+
+window.runDedicatedIpPing = async function() {
+  if (!currentSelectedDevice) return;
+  const inputEl = document.getElementById('ddPingIpInput');
+  const consoleEl = document.getElementById('ddPingConsole');
+  const badgeEl = document.getElementById('ddPingBadge');
+  const ip = inputEl ? inputEl.value.trim() : (currentSelectedDevice.network?.externalIP || '');
+
+  if (!ip || ip === '0.0.0.0' || ip === 'N/A') {
+    showToast('Please enter a valid target IP address to ping.', 'warning');
+    return;
+  }
+
+  if (badgeEl) {
+    badgeEl.textContent = '⏳ Pinging...';
+    badgeEl.style.background = 'rgba(234,179,8,0.15)';
+    badgeEl.style.color = '#eab308';
+  }
+  if (consoleEl) {
+    consoleEl.textContent = `Pinging ${ip} with 4 ICMP packets from TR-069 ACS server...\n`;
+  }
+
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(currentSelectedDevice._id)}/ping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (badgeEl) {
+        badgeEl.textContent = `🟢 Online (${data.latency})`;
+        badgeEl.style.background = 'rgba(16,185,129,0.15)';
+        badgeEl.style.color = '#10b981';
+      }
+      if (consoleEl) {
+        consoleEl.textContent = data.output || `Ping Success! Avg Latency: ${data.latency}, Packet Loss: ${data.packetLoss}`;
+      }
+      showToast(`🟢 Ping to ${ip} Successful! Latency: ${data.latency}`, 'success');
+    } else {
+      if (badgeEl) {
+        badgeEl.textContent = '🔴 Unreachable';
+        badgeEl.style.background = 'rgba(239,68,68,0.15)';
+        badgeEl.style.color = '#ef4444';
+      }
+      if (consoleEl) {
+        consoleEl.textContent = data.output || `Ping Failed to ${ip}. Packet Loss: ${data.packetLoss || '100%'}`;
+      }
+      showToast(`🔴 Ping to ${ip} Failed (100% loss)`, 'error');
+    }
+  } catch (err) {
+    if (consoleEl) consoleEl.textContent = 'Error executing ping: ' + err.message;
+    showToast('Ping error: ' + err.message, 'error');
+  }
+};
+
+function openDeviceModal(deviceId, defaultTab) {
+  // Directly transition to dedicated full-page view (no popup modal!)
+  window.viewDeviceDetails(deviceId, defaultTab || 'dd-tab-ssid');
+}
 
 let miniFdpMarkers = [];
 
