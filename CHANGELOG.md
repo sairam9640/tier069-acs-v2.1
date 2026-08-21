@@ -4,6 +4,15 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.8] - 2026-08-21
+
+### 🛡️ CWMP Standard InformResponse & IP Quarantine Throttling
+- **Minimal InformResponse on Rejections:** All dropped, malformed, or throttled CWMP Informs receive a valid standard `<cwmp:InformResponse>` envelope (HTTP 200) rather than a bare 204, preventing physical CPEs from falling into infinite inform retry storms.
+- **IP Quarantine Creation Rate Limiter:** Enforced sliding window throttle limiting new `UNVERIFIED` device creations to **max 5 per source IP per hour**, thwarting queue flood attacks from botnets.
+- **NOC UI Quarantined Device Management:** Added dedicated `🛡️ UNVERIFIED` status filter in `public/index.html` and a 1-click `✅ Approve` verification button in `public/app.js` table rows triggering `/api/devices/:id/verify`.
+
+---
+
 ## [v2.1.7] - 2026-08-21
 
 ### 🛡️ Device Onboarding Validation & Quarantine Protection

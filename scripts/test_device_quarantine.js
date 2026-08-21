@@ -82,8 +82,8 @@ async function testDeviceQuarantine() {
   assert.strictEqual(dev.quarantined, true, 'First-time device must be quarantined');
   console.log('  ✅ First-Time Device Successfully Quarantined: PASSED\n');
 
-  // 3. Test Malformed / Implausible Serial Rejection
-  console.log('👉 [2. IMPLAUSIBLE / MALFORMED SERIAL REJECTION]');
+  // 3. Test Malformed / Implausible Serial Rejection & Response Envelope
+  console.log('👉 [2. IMPLAUSIBLE / MALFORMED SERIAL REJECTION WITH MINIMAL INFORMRESPONSE]');
   const malformedPayload = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cwmp="urn:dslforum-org:cwmp-1-0">
   <soap:Header><cwmp:ID>2002</cwmp:ID></soap:Header>
   <soap:Body>
@@ -99,6 +99,7 @@ async function testDeviceQuarantine() {
   </soap:Body>
 </soap:Envelope>`;
 
+  let malformedRespBody = '';
   await new Promise((resolve) => {
     const req = http.request({
       hostname: '127.0.0.1',
@@ -110,17 +111,21 @@ async function testDeviceQuarantine() {
         'Content-Length': Buffer.byteLength(malformedPayload)
       }
     }, (res) => {
-      assert.strictEqual(res.statusCode, 204, 'Malformed serial Inform must be dropped with 204');
-      res.on('data', () => {});
+      assert.strictEqual(res.statusCode, 200, 'Malformed Inform must receive HTTP 200 with standard InformResponse to prevent CPE retry loop');
+      res.on('data', chunk => malformedRespBody += chunk);
       res.on('end', resolve);
     });
     req.write(malformedPayload);
     req.end();
   });
 
+  assert.ok(malformedRespBody.includes('<cwmp:InformResponse>'), 'Response must contain valid cwmp:InformResponse XML');
+  console.log('  Malformed Inform Response Body Received:');
+  console.log('  ' + malformedRespBody.trim().replace(/\n/g, '\n  '));
+
   const badDev = await db.getDevice('TP-Link_!@#$$%^&*');
   assert.strictEqual(badDev, null, 'Malformed serial must never be persisted in MongoDB');
-  console.log('  ✅ Malformed Serial Number Rejected without Database Write: PASSED\n');
+  console.log('  ✅ Malformed Serial Rejected from DB & Acknowledged with InformResponse: PASSED\n');
 
   // 4. Operator Verification Flow
   console.log('👉 [3. OPERATOR VERIFICATION / APPROVAL TRANSITION]');

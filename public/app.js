@@ -864,9 +864,10 @@ function filterDevicesList() {
     const isOnline = isDeviceOnline(d);
     const rx = parseFloat(d.opticalPower?.rxPower || d.opticalPower?.rx);
 
-    if (statusVal === 'online' && !isOnline) return false;
-    if (statusVal === 'offline' && isOnline) return false;
-    if (statusVal === 'weak' && (isNaN(rx) || rx >= -24)) return false;
+    if (statusVal === 'UNVERIFIED' && d.status !== 'UNVERIFIED' && !d.quarantined) return false;
+    if (statusVal === 'online' && (!isOnline || d.status === 'UNVERIFIED')) return false;
+    if (statusVal === 'offline' && (isOnline || d.status === 'UNVERIFIED')) return false;
+    if (statusVal === 'weak' && (isNaN(rx) || rx >= -24 || d.status === 'UNVERIFIED')) return false;
 
     if (ponVal !== 'ALL') {
       const pStr = (d.ponPort || d.oltPort || '').toLowerCase();
@@ -1018,7 +1019,11 @@ function renderDevicesTable(devices) {
     let optClass = 'ont-opt-good';
     let optDisplay = `${rxVal.toFixed(2)} dBm`;
 
-    if (!isOnline || isNaN(rxVal) || rxVal <= -90) {
+    if (d.status === 'UNVERIFIED' || d.quarantined === true) {
+      statusBadgeHtml = `<span class="tailadmin-badge warning" style="background:#f59e0b;color:#000;font-weight:700;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.72rem;">🛡️ UNVERIFIED</span>`;
+      optClass = 'ont-opt-none';
+      optDisplay = 'Pending';
+    } else if (!isOnline || isNaN(rxVal) || rxVal <= -90) {
       statusBadgeHtml = `<span class="status-badge-offline">Offline</span>`;
       optClass = 'ont-opt-none';
       optDisplay = 'N/A';
@@ -1043,7 +1048,9 @@ function renderDevicesTable(devices) {
 
     // 8. TR-069 STATUS
     let tr069Html = `<span class="tr069-tag-connected">Connected</span>`;
-    if (!isOnline) {
+    if (d.status === 'UNVERIFIED' || d.quarantined === true) {
+      tr069Html = `<button class="btn-primary" style="padding:0.25rem 0.6rem;font-size:0.72rem;background:#10b981;border:none;border-radius:4px;color:#fff;cursor:pointer;font-weight:700;" onclick="event.stopPropagation(); window.verifyQuarantinedDevice('${escapeHtml(d._id)}')">✅ Approve</button>`;
+    } else if (!isOnline) {
       tr069Html = `<span class="tr069-tag-offline">Offline</span>`;
     } else if (rxVal < -24) {
       tr069Html = `<span class="tr069-tag-failed">Inform Failed</span>`;
@@ -6849,4 +6856,22 @@ window.triggerRemoteRouterDiagnostics = async function() {
   setTimeout(() => {
     showToast('🟢 Ping Test Complete: 0% Packet Loss, Round-Trip Latency: 4.2ms', 'success');
   }, 1200);
+};
+
+window.verifyQuarantinedDevice = async function(deviceId) {
+  if (!confirm(`Approve and activate quarantined device "${deviceId}" for live subscriber fleet management?`)) return;
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(deviceId)}/verify`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('✅ Device approved and verified as active subscriber!', 'success');
+      loadDevices();
+    } else {
+      showToast(data.error || data.message || 'Failed to verify device', 'error');
+    }
+  } catch (err) {
+    showToast('Verification failed: ' + err.message, 'error');
+  }
 };
