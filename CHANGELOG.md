@@ -4,6 +4,16 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.1] - 2026-08-21
+
+### 🛡️ Billing & Radius Sync Production Hardening
+- **Zero Fallback Defaults & Loud Failure:** Removed hardcoded URLs and secrets. The service now fails loudly with `FATAL CONFIG` warnings if `BILLING_WEBHOOK_URL` or `BILLING_WEBHOOK_SECRET` are missing in `.env`.
+- **Loopback Detection:** Warns operators when `BILLING_WEBHOOK_URL` points to `127.0.0.1`, `localhost`, or private RFC1918 subnets.
+- **Queue Sweeper & Drain Job:** `drainBillingSyncQueue` runs every 3 minutes, re-attempting pending/failed syncs and escalating items that exceed 8 retries or 24 hours to `NEEDS_MANUAL_REVIEW`.
+- **Dry-Run Connection Validator:** Added `/api/billing/test-connection` admin endpoint for live ping and HMAC latency tests.
+- **Strict Success Verification:** `billingSynced: true` is strictly reserved for verified external 2xx HTTP delivery.
+- **Authentication Documentation:** Added formal HMAC-SHA256 protocol specification and multi-provider adaptation guidelines (Bearer/OAuth2/Basic Auth/API Key) at the top of `billing-sync-service.js`.
+
 ---
 
 ## [v2.1.0] - 2026-08-21
