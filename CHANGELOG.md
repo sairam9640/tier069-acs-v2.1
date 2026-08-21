@@ -4,6 +4,14 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.2] - 2026-08-21
+
+### 🔒 Strict Production Loopback Refusal & Payload Identifier Fix
+- **Production Loopback Blocking:** If `BILLING_WEBHOOK_URL` resolves to `127.0.0.1`, `localhost`, or RFC1918 private subnets, sync requests are refused with status `BLOCKED_LOOPBACK_IN_PRODUCTION` and `billingSynced: false`. Loopback delivery is only permitted when explicitly authorized via `ALLOW_LOOPBACK_BILLING=true` in `.env` for development/testing.
+- **Payload Customer Identifier Fix:** Guaranteed subscriber identifier resolution across all WAN sync and dry-run health-check payloads (`username: 'admin_health_check'` / subscriber PPPoE ID), eliminating `undefined` references in billing response messages.
+
+---
+
 ## [v2.1.1] - 2026-08-21
 
 ### 🛡️ Billing & Radius Sync Production Hardening

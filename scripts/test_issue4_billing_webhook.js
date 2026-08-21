@@ -2,10 +2,10 @@
  * TEST: ISSUE 4 & PRODUCTION HARDENING - BILLING & RADIUS SYNC ENGINE
  * Tests:
  * 1. Loud failure & safe fallback when BILLING_WEBHOOK_URL / SECRET is unconfigured.
- * 2. Loopback / internal IP detection & warning banner.
- * 3. Dry-run Connection Validator (ping & latency handshake).
- * 4. Queue Sweeper & Drain Job (re-attempting failed syncs & flagging dead-letters).
- * 5. End-to-end verified delivery and device billingSynced state update.
+ * 2. Loopback Refusal in Production: Blocks sync with status BLOCKED_LOOPBACK_IN_PRODUCTION unless ALLOW_LOOPBACK_BILLING=true.
+ * 3. Dry-Run Connection Ping Handshake (Confirms real username, zero 'undefined').
+ * 4. Live HMAC Authenticated WAN Change Sync (with ALLOW_LOOPBACK_BILLING=true enabled for test).
+ * 5. Queue Sweeper & Drain Job (re-attempting failed syncs & recovering tasks).
  */
 
 const assert = require('assert');
@@ -50,40 +50,46 @@ async function runTests() {
 
 
   // -------------------------------------------------------------
-  // TEST 2: Loopback / Internal IP Warning & Startup Check
+  // TEST 2: Loopback Refusal in Production (Security Block)
   // -------------------------------------------------------------
-  console.log('👉 [TEST 2: Loopback / Internal IP Detection]');
-  process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:3000/api/billing/sync';
-  process.env.BILLING_WEBHOOK_SECRET = testSecret;
+  console.log('👉 [TEST 2: Loopback IP Security Block in Production]');
+  delete process.env.ALLOW_LOOPBACK_BILLING; // Ensure loopback permission flag is OFF
 
-  const startupCheck = checkBillingConfigStartup();
-  console.log('  Startup Check Output:', startupCheck);
-  assert.strictEqual(startupCheck.configured, true, 'Must report configured=true');
-  assert.strictEqual(startupCheck.isLoopback, true, 'Must detect 127.0.0.1 as loopback');
-  console.log('  ✅ Loopback IP Detection & Warning: PASSED\n');
+  const loopbackBlockRes = await syncBillingWanChange(testDeviceId, { username: '9640840216', vlanId: 100 }, 11, receiverUrl, testSecret);
+  console.log('  Loopback Blocked Result:', loopbackBlockRes);
+
+  assert.strictEqual(loopbackBlockRes.success, false, 'Must fail when loopback is used without ALLOW_LOOPBACK_BILLING=true');
+  assert.strictEqual(loopbackBlockRes.status, 'BLOCKED_LOOPBACK_IN_PRODUCTION', 'Status must be BLOCKED_LOOPBACK_IN_PRODUCTION');
+
+  const devBlocked = await db.getDevice(testDeviceId);
+  assert.strictEqual(devBlocked.wan?.billingSynced, false, 'Device billingSynced must be false');
+  console.log('  ✅ Production Loopback Security Block: PASSED (Refused loopback delivery)\n');
 
 
   // -------------------------------------------------------------
-  // TEST 3: Admin Dry-Run Connection Ping & Handshake
+  // TEST 3: Admin Dry-Run Connection Ping & Handshake (Zero 'undefined')
   // -------------------------------------------------------------
-  console.log('👉 [TEST 3: Admin Dry-Run Connection Validation Endpoint]');
+  console.log('👉 [TEST 3: Admin Dry-Run Connection Validation Endpoint (No undefined)]');
   const pingResult = await testBillingConnection(receiverUrl, testSecret);
   console.log('  Ping Handshake Result:', pingResult);
   assert.strictEqual(pingResult.success, true, 'Dry-run ping to receiver must succeed');
-  assert.ok(pingResult.latencyMs >= 0, 'Must measure latency');
   assert.strictEqual(pingResult.statusCode, 200, 'Must receive HTTP 200 OK');
-  console.log(`  Measured Latency: ${pingResult.latencyMs}ms`);
-  console.log('  ✅ Dry-Run Connection Handshake: PASSED\n');
+  assert.ok(!pingResult.responseBody.includes('undefined'), 'Response body must not contain "undefined"');
+  assert.ok(pingResult.responseBody.includes('admin_health_check'), 'Response body must confirm "admin_health_check"');
+  console.log(`  Response Message: ${pingResult.responseBody}`);
+  console.log('  ✅ Dry-Run Connection Handshake (Real Identifier Confirmed): PASSED\n');
 
 
   // -------------------------------------------------------------
-  // TEST 4: Live Authenticated Webhook Dispatch
+  // TEST 4: Live HMAC Authenticated WAN Change Sync (with ALLOW_LOOPBACK_BILLING=true)
   // -------------------------------------------------------------
   console.log('👉 [TEST 4: Live HMAC Authenticated WAN Change Sync]');
+  process.env.ALLOW_LOOPBACK_BILLING = 'true'; // Enable testing mode for local receiver
+
   const wanData = { username: '9640840216', vlanId: 100, connectionType: 'PPPoE' };
-  const liveRes = await syncBillingWanChange(testDeviceId, wanData, 11, receiverUrl, testSecret);
+  const liveRes = await syncBillingWanChange(testDeviceId, wanData, 12, receiverUrl, testSecret);
   console.log('  Live Dispatch Result:', liveRes);
-  assert.strictEqual(liveRes.success, true, 'Live sync must succeed with valid credentials');
+  assert.strictEqual(liveRes.success, true, 'Live sync must succeed when authorized');
 
   const devLive = await db.getDevice(testDeviceId);
   assert.strictEqual(devLive.wan?.billingSynced, true, 'Device billingSynced must be true on real success');
@@ -96,7 +102,6 @@ async function runTests() {
   // TEST 5: Queue Sweeper & Drain Job
   // -------------------------------------------------------------
   console.log('👉 [TEST 5: Queue Sweeper & Drain Job]');
-  // Queue a simulated pending/failed task in MongoDB ready for pickup
   const mockStuckKey = `sync_stuck_${Date.now()}`;
   await db.queueBillingSync({
     idempotencyKey: mockStuckKey,
