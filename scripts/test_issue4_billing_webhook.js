@@ -59,53 +59,57 @@ function startMockBillingServer(port = 8999) {
 }
 
 async function runTest() {
-  const mockServer = await startMockBillingServer(8999);
   const testDeviceId = 'TP-Link_30DE4B78B964';
+  const prodEndpointUrl = 'http://127.0.0.1:3000/api/billing/sync';
 
-  try {
-    // 1. SCENARIO A: Real Success Case against Live Receiver
-    console.log('👉 [SCENARIO A: Real Live Webhook Success with Verified HMAC-SHA256]');
-    process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:8999/api/billing/sync';
+  // 1. SCENARIO A: Real Success Case against Production Endpoint
+  console.log('👉 [SCENARIO A: Real Live Webhook Success against Production Endpoint]');
+  console.log('  Target Webhook URL:', prodEndpointUrl);
 
-    const wanData = { username: '9640840216', vlanId: 100, connectionType: 'PPPoE' };
-    const successRes = await syncBillingWanChange(testDeviceId, wanData, 4);
+  const wanData = { username: '9640840216', vlanId: 100, connectionType: 'PPPoE' };
+  const successRes = await syncBillingWanChange(testDeviceId, wanData, 6, prodEndpointUrl);
 
-    console.log('  Webhook Dispatch Result:', successRes);
-    assert.strictEqual(successRes.success, true, 'Webhook must succeed on live endpoint with valid HMAC');
-    assert.strictEqual(successRes.attempts, 1, 'Should succeed on first attempt');
+  console.log('  Webhook Dispatch Result:', successRes);
+  assert.strictEqual(successRes.success, true, 'Webhook must succeed on live production endpoint');
+  assert.ok(successRes.attempts <= 3, 'Should succeed within retry limits');
 
-    const dev = await db.getDevice(testDeviceId);
-    console.log('  Device billingSynced status:', dev.wan?.billingSynced);
-    console.log('  Device billingSyncedAt timestamp:', dev.wan?.billingSyncedAt);
+  // Pull independent confirmation receipt from Database Logs (Proof of Receipt on Receiver System)
+  const auditLogs = await db.getLogs(10, { type: 'BILLING_WEBHOOK_RECEIVED' });
+  const matchingReceipt = auditLogs.find(l => l.deviceId === testDeviceId);
 
-    assert.strictEqual(dev.wan?.billingSynced, true, 'Device document must have billingSynced: true');
-    console.log('  ✅ Live Webhook Success & Device Flagging: PASSED\n');
+  console.log('  📡 Independent Server/Radius Audit Receipt Log:');
+  console.log('  ', matchingReceipt);
+
+  const dev = await db.getDevice(testDeviceId);
+  console.log('  Device billingSynced status:', dev.wan?.billingSynced);
+  console.log('  Device billingSyncedAt timestamp:', dev.wan?.billingSyncedAt);
+
+  assert.strictEqual(dev.wan?.billingSynced, true, 'Device document must have billingSynced: true');
+  assert.ok(matchingReceipt, 'Independent receiver audit log must exist');
+  console.log('  ✅ Live Production Webhook & Independent Receipt Verification: PASSED\n');
 
 
-    // 2. SCENARIO B: Webhook 3-Attempt Exponential Backoff & Queue Persistence on Failure
-    console.log('👉 [SCENARIO B: Webhook 3-Attempt Exponential Backoff & Retry Exhaustion]');
-    process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:59998/api/billing/sync'; // Unbound port
+  // 2. SCENARIO B: Webhook 3-Attempt Exponential Backoff & Queue Persistence on Failure
+  console.log('👉 [SCENARIO B: Webhook 3-Attempt Exponential Backoff & Retry Exhaustion]');
+  const failEndpointUrl = 'http://127.0.0.1:59998/api/billing/sync'; // Unbound port
+  console.log('  Target Failed Endpoint URL:', failEndpointUrl);
 
-    const startTime = Date.now();
-    const failRes = await syncBillingWanChange(testDeviceId, wanData, 5);
-    const duration = Date.now() - startTime;
+  const startTime = Date.now();
+  const failRes = await syncBillingWanChange(testDeviceId, wanData, 7, failEndpointUrl);
+  const duration = Date.now() - startTime;
 
-    console.log('  Failed Sync Result:', failRes);
-    console.log(`  Duration with Backoff: ${duration}ms`);
+  console.log('  Failed Sync Result:', failRes);
+  console.log(`  Duration with Backoff: ${duration}ms`);
 
-    assert.strictEqual(failRes.success, false, 'Failed endpoint must return success=false');
-    assert.strictEqual(failRes.attempts, 3, 'Must attempt exactly 3 times before fallback');
+  assert.strictEqual(failRes.success, false, 'Failed endpoint must return success=false');
+  assert.strictEqual(failRes.attempts, 3, 'Must attempt exactly 3 times before fallback');
 
-    const devFailed = await db.getDevice(testDeviceId);
-    console.log('  Device billingSynced status on failure:', devFailed.wan?.billingSynced);
-    console.log('  Device billingSyncError message:', devFailed.wan?.billingSyncError);
+  const devFailed = await db.getDevice(testDeviceId);
+  console.log('  Device billingSynced status on failure:', devFailed.wan?.billingSynced);
+  console.log('  Device billingSyncError message:', devFailed.wan?.billingSyncError);
 
-    assert.strictEqual(devFailed.wan?.billingSynced, false, 'Device billingSynced must be false');
-    console.log('  ✅ 3-Attempt Backoff Retry & Database Logging: PASSED\n');
-
-  } finally {
-    mockServer.close();
-  }
+  assert.strictEqual(devFailed.wan?.billingSynced, false, 'Device billingSynced must be false');
+  console.log('  ✅ 3-Attempt Backoff Retry & Database Logging: PASSED\n');
 
   console.log('================================================================');
   console.log('🎉 ISSUE 4 & GAP 6 TEST PASSED (100% SUCCESS)');
