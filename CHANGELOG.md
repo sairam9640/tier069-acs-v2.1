@@ -4,6 +4,16 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.7] - 2026-08-21
+
+### 🛡️ Device Onboarding Validation & Quarantine Protection
+- **First-Time Device Quarantine:** All newly discovered devices informing for the first time without pre-provisioned records are quarantined with `status: 'UNVERIFIED'`, `isVerified: false`, and `quarantined: true`, preventing unapproved phantom entries in live subscriber lists.
+- **Serial Plausibility & Format Validation:** Rejects and drops malformed or implausible serial numbers (non-alphanumeric, length < 4 or > 64) with `HTTP 204` without touching MongoDB.
+- **Operator Verification Endpoint:** Implemented `POST /api/devices/:id/verify` for authorized operators to approve unverified devices into active fleet monitoring.
+- **Test Artifact Cleanup:** Purged phantom test record `TP-Link_LIVE_TEST_SN_999` from MongoDB.
+
+---
+
 ## [v2.1.5] - 2026-08-21
 
 ### 🛡️ Comprehensive Security Hardening & Audit Remediations
