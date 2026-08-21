@@ -50,6 +50,7 @@ const periodicResult = normalizeDeviceData(
 );
 
 console.log('👉 [SCENARIO A: Stale Periodic Inform within 120s Lock]');
+console.log('  Event Array:', JSON.stringify(['2 PERIODIC']));
 console.log('  Manual Value Pushed:', existingDev.wifi.ssids[0].ssid);
 console.log('  Incoming Inform Value:', staleRawParams['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID']);
 console.log('  Resolved SSID Value:', periodicResult.wifi.ssids[0].ssid);
@@ -72,6 +73,7 @@ const valueChangeResult = normalizeDeviceData(
 );
 
 console.log('👉 [SCENARIO B: Legitimate Customer Local Change (Event 4 VALUE CHANGE)]');
+console.log('  Event Array:', JSON.stringify(['4 VALUE CHANGE', '2 PERIODIC']));
 console.log('  Incoming Customer Value:', customerChangedParams['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID']);
 console.log('  Resolved SSID Value:', valueChangeResult.wifi.ssids[0].ssid);
 

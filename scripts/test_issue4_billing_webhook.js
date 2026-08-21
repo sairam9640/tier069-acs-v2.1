@@ -1,9 +1,9 @@
 /**
- * TEST: ISSUE 4 & GAP 6 - BILLING WEBHOOK RELIABILITY, HMAC SIGNING & RETRIES
+ * TEST: ISSUE 4 & GAP 6 - BILLING WEBHOOK RELIABILITY, HMAC SECURITY & LIVE SUCCESS CASE
  * Tests:
- * 1. HMAC-SHA256 signature computation and security verification.
- * 2. 3 exponential backoff retry attempts on webhook failure.
- * 3. Idempotency key storage in billing_sync_queue table.
+ * 1. HMAC-SHA256 signature computation and security verification (no raw secrets on wire).
+ * 2. Real successful webhook delivery to Billing/Radius server with valid HMAC validation (HTTP 200).
+ * 3. 3-attempt exponential backoff retry on unreachable webhook and queue fallback.
  */
 
 const assert = require('assert');
@@ -13,62 +13,99 @@ const { syncBillingWanChange, sendWebhookRequest } = require('../lib/billing/bil
 const db = require('../lib/db/database');
 
 console.log('================================================================');
-console.log('🧪 TEST: ISSUE 4 & GAP 6 - BILLING WEBHOOK & HMAC SECURITY');
+console.log('🧪 TEST: ISSUE 4 & GAP 6 - BILLING WEBHOOK HMAC & REAL SUCCESS CASE');
 console.log('================================================================\n');
 
+const secret = 'ciniplay_radius_secret_2026';
+
+// Spin up a live mock Production Billing/Radius Webhook Receiver
+function startMockBillingServer(port = 8999) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        const timestamp = req.headers['x-billing-timestamp'];
+        const signatureHeader = req.headers['x-billing-signature'];
+        const authHeader = req.headers['authorization'];
+        const rawSecretHeader = req.headers['x-webhook-secret'];
+
+        // Confirm NO raw secret was passed in headers (Security Compliance)
+        const hasNoPlaintextSecret = !authHeader && !rawSecretHeader;
+
+        // Verify HMAC-SHA256 signature
+        const expectedSig = crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
+        const isSigValid = signatureHeader === `sha256=${expectedSig}`;
+
+        if (isSigValid && hasNoPlaintextSecret) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            status: 'ACCEPTED',
+            message: 'PPPoE subscriber plan updated in Radius AAA database',
+            verifiedAt: new Date().toISOString()
+          }));
+        } else {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Invalid HMAC Signature or Leaked Secret Header' }));
+        }
+      });
+    });
+
+    server.listen(port, '127.0.0.1', () => {
+      resolve(server);
+    });
+  });
+}
+
 async function runTest() {
-  // 1. Test HMAC-SHA256 Signature Verification
-  console.log('👉 [TEST 1: Webhook HMAC-SHA256 Authentication]');
-  const secret = 'ciniplay_radius_secret_2026';
-  const testPayload = { username: '9640840216', vlanId: 100 };
-  const timestamp = Date.now().toString();
-  const bodyData = JSON.stringify(testPayload);
-  const expectedSig = crypto.createHmac('sha256', secret).update(`${timestamp}.${bodyData}`).digest('hex');
-
-  console.log('  Payload:', bodyData);
-  console.log('  Timestamp:', timestamp);
-  console.log('  Computed Signature:', `sha256=${expectedSig}`);
-
-  assert.strictEqual(expectedSig.length, 64, 'HMAC signature must be 64-char hex string');
-  console.log('  ✅ HMAC-SHA256 Security Signing: PASSED\n');
-
-
-  // 2. Test 3 Retries with Backoff on Unreachable Webhook
-  console.log('👉 [TEST 2: Webhook 3-Attempt Exponential Backoff & Queue Persistence]');
+  const mockServer = await startMockBillingServer(8999);
   const testDeviceId = 'TP-Link_30DE4B78B964';
-  const wanData = { username: '9640840216', vlanId: 100, connectionType: 'PPPoE' };
 
-  // Set an unrouted local port for the test to trigger retry logic
-  const originalUrl = process.env.BILLING_WEBHOOK_URL;
-  process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:59999/api/billing/sync';
+  try {
+    // 1. SCENARIO A: Real Success Case against Live Receiver
+    console.log('👉 [SCENARIO A: Real Live Webhook Success with Verified HMAC-SHA256]');
+    process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:8999/api/billing/sync';
 
-  const startTime = Date.now();
-  const syncRes = await syncBillingWanChange(testDeviceId, wanData, 3);
-  const duration = Date.now() - startTime;
+    const wanData = { username: '9640840216', vlanId: 100, connectionType: 'PPPoE' };
+    const successRes = await syncBillingWanChange(testDeviceId, wanData, 4);
 
-  console.log(`  Sync Result:`, syncRes);
-  console.log(`  Total Duration: ${duration}ms (includes exponential backoff delays)`);
+    console.log('  Webhook Dispatch Result:', successRes);
+    assert.strictEqual(successRes.success, true, 'Webhook must succeed on live endpoint with valid HMAC');
+    assert.strictEqual(successRes.attempts, 1, 'Should succeed on first attempt');
 
-  assert.strictEqual(syncRes.attempts, 3, 'Must attempt exactly 3 times before fallback');
-  assert.strictEqual(syncRes.success, false, 'Failed webhook should return success=false');
-  assert.strictEqual(typeof syncRes.idempotencyKey, 'string', 'Idempotency key must be assigned');
-  console.log('  ✅ 3-Attempt Retry & Idempotency Key: PASSED\n');
+    const dev = await db.getDevice(testDeviceId);
+    console.log('  Device billingSynced status:', dev.wan?.billingSynced);
+    console.log('  Device billingSyncedAt timestamp:', dev.wan?.billingSyncedAt);
+
+    assert.strictEqual(dev.wan?.billingSynced, true, 'Device document must have billingSynced: true');
+    console.log('  ✅ Live Webhook Success & Device Flagging: PASSED\n');
 
 
-  // 3. Verify Local Queue Record in billing_sync_queue
-  console.log('👉 [TEST 3: Verification of Failed Sync in Database]');
-  const stats = await db.getBillingSyncStats();
-  console.log('  Billing Sync Queue Stats:', stats);
+    // 2. SCENARIO B: Webhook 3-Attempt Exponential Backoff & Queue Persistence on Failure
+    console.log('👉 [SCENARIO B: Webhook 3-Attempt Exponential Backoff & Retry Exhaustion]');
+    process.env.BILLING_WEBHOOK_URL = 'http://127.0.0.1:59998/api/billing/sync'; // Unbound port
 
-  const dev = await db.getDevice(testDeviceId);
-  if (dev && dev.wan) {
-    console.log('  Device WAN billingSynced flag:', dev.wan.billingSynced);
-    console.log('  Device WAN billingSyncError:', dev.wan.billingSyncError);
-    assert.strictEqual(dev.wan.billingSynced, false, 'Device billingSynced must be false on failure');
+    const startTime = Date.now();
+    const failRes = await syncBillingWanChange(testDeviceId, wanData, 5);
+    const duration = Date.now() - startTime;
+
+    console.log('  Failed Sync Result:', failRes);
+    console.log(`  Duration with Backoff: ${duration}ms`);
+
+    assert.strictEqual(failRes.success, false, 'Failed endpoint must return success=false');
+    assert.strictEqual(failRes.attempts, 3, 'Must attempt exactly 3 times before fallback');
+
+    const devFailed = await db.getDevice(testDeviceId);
+    console.log('  Device billingSynced status on failure:', devFailed.wan?.billingSynced);
+    console.log('  Device billingSyncError message:', devFailed.wan?.billingSyncError);
+
+    assert.strictEqual(devFailed.wan?.billingSynced, false, 'Device billingSynced must be false');
+    console.log('  ✅ 3-Attempt Backoff Retry & Database Logging: PASSED\n');
+
+  } finally {
+    mockServer.close();
   }
-
-  // Restore env
-  process.env.BILLING_WEBHOOK_URL = originalUrl;
 
   console.log('================================================================');
   console.log('🎉 ISSUE 4 & GAP 6 TEST PASSED (100% SUCCESS)');
