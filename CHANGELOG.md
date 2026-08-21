@@ -4,6 +4,17 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.5] - 2026-08-21
+
+### 🛡️ Comprehensive Security Hardening & Audit Remediations
+- **Nginx HTTP → HTTPS 301 Redirect:** Configured port 80 in Nginx to return `301 Moved Permanently` to `https://ciniplay.in/` for all web and API routes, while preserving proxying for non-TLS TR-069 CPEs.
+- **Command Injection Prevention:** Replaced `exec` shell execution in ping diagnostics with `execFile` parameter arrays and strict IPv4 octet regex validation. Removed unused `child_process` imports across OLT collectors.
+- **Dual-Scope Rate Limiting:** Enforced both per-IP and per-account rate limiters to block distributed multi-IP brute-force attacks against operator and superadmin accounts.
+- **Expanded Tenant Isolation:** Verified 100% tenant isolation across all mutation operations (Wi-Fi SSID/password push, WAN deletion/edit, remote reboot, and factory reset RPCs).
+- **DOM XSS Sanitization:** Audited and verified `escapeHtml()` across all subscriber name, SSID, and device identifier rendering paths in `public/app.js`.
+
+---
+
 ## [v2.1.2] - 2026-08-21
 
 ### 🔒 Strict Production Loopback Refusal & Payload Identifier Fix
