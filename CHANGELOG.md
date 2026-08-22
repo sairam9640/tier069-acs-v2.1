@@ -4,6 +4,15 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.1] - 2026-08-22
+
+### 🔄 Router Parameter Restructuring & Intelligent Customer Auto-Enrichment
+- **Automatic Customer Data Enrichment:** Enhanced `enrichCustomerProfile()` to automatically parse clean subscriber names and extract 10-digit mobile phone numbers from PPPoE subscriber IDs (`ss8549293374_sid@ftth.bsnl.in` -> phone `8549293374`), Wi-Fi passphrases, and custom Wi-Fi SSIDs.
+- **Universal Parameter Normalization:** Restructured device normalization in `parameter-mapper.js` to ensure optical power, multi-band Wi-Fi SSIDs, WAN connections, and LAN clients maintain clean, verified structures across all router models.
+- **Full Fleet Database Synchronization:** Executed database migration across all 29 devices in MongoDB, eliminating generic unassigned labels and syncing live customer records.
+
+---
+
 ## [v2.2.0] - 2026-08-22
 
 ### ⚡ GenieACS Standard Task Pipeline & Multi-Vendor RPC Execution
