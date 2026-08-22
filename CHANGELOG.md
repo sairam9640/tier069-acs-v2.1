@@ -4,6 +4,14 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.9] - 2026-08-22
+
+### ⚡ Port 80 CWMP Ingestion & Active Fleet Restoration
+- **Port 80 SOAP Informs Reverse Proxying:** Configured Nginx on port 80 to proxy all inbound `POST` CWMP SOAP Inform packets directly to the CWMP engine (`127.0.0.1:7547`), while maintaining strict `301 HTTPS` redirects for web browser `GET` requests. Restored connectivity for legacy ONTs configured with `http://...` port 80 ACS URLs.
+- **Fleet Auto-Verification & Online Status Fix:** Fixed status regression where existing subscriber devices were misclassified as `UNVERIFIED`. All active subscriber devices reporting CWMP keepalives now correctly maintain `status: 'online'` and `isVerified: true`.
+
+---
+
 ## [v2.1.8] - 2026-08-21
 
 ### 🛡️ CWMP Standard InformResponse & IP Quarantine Throttling
