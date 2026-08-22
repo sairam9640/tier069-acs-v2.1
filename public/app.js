@@ -2520,34 +2520,49 @@ window.summonCurrentDevice = async function() {
     btn.innerHTML = `<span>⏳</span> <span>Syncing...</span>`;
   }
 
-  showToast(`⚡ Initiating TR-069 Real-Time Sync with ${devName}...`, 'info');
+  showToast(`⚡ Initiating TR-069 Real-Time Summon for ${devName}...`, 'info');
 
-  let countdown = 5;
-  const syncInterval = setInterval(async () => {
-    countdown--;
-    if (countdown > 0) {
-      showToast(`🔄 Communicating with ONT router... (${countdown}s remaining)`, 'info');
+  try {
+    const res = await authFetch(`/api/devices/${encodeURIComponent(devId)}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+
+    if (data && data.success) {
+      if (data.triggered) {
+        showToast(`🚀 Direct wake-up delivered to ONT! Retrieving live data...`, 'success');
+        setTimeout(async () => {
+          await loadDevices();
+          const activeTabEl = document.querySelector('.dd-tab-btn.active');
+          const activeTabId = activeTabEl ? activeTabEl.getAttribute('data-ddtab') : 'dd-tab-ssid';
+          window.viewDeviceDetails(devId, activeTabId);
+          showToast(`✅ ${devName} synchronized with latest hardware parameters!`, 'success');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<span>🔄</span> <span>Summon</span>`;
+          }
+        }, 3000);
+      } else {
+        showToast(`ℹ️ Sync task queued with Priority 100! Router is behind NAT — will sync on next keepalive check-in.`, 'warning');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<span>🔄</span> <span>Summon</span>`;
+        }
+      }
     } else {
-      clearInterval(syncInterval);
-      showToast(`✅ ${devName} successfully synchronized! Latest router & customer data refreshed.`, 'success');
-      await loadDevices();
-      const activeTabEl = document.querySelector('.dd-tab-btn.active');
-      const activeTabId = activeTabEl ? activeTabEl.getAttribute('data-ddtab') : 'dd-tab-ssid';
-      window.viewDeviceDetails(devId, activeTabId);
+      showToast(data?.message || data?.error || 'Failed to trigger summon', 'error');
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = `<span>🔄</span> <span>Summon</span>`;
       }
     }
-  }, 1000);
-
-  try {
-    await authFetch(`/api/devices/${encodeURIComponent(devId)}/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
   } catch (err) {
-    console.warn('Summon request sent to queue:', err);
+    showToast('Summon error: ' + err.message, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>🔄</span> <span>Summon</span>`;
+    }
   }
 };
 
