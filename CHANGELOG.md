@@ -4,6 +4,15 @@ All notable changes to the **Tier-069 TR-069 ACS Engine** (`ciniplay` Router Man
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.0] - 2026-08-22
+
+### ⚡ GenieACS Standard Task Pipeline & Multi-Vendor RPC Execution
+- **GenieACS Priority Queueing:** Implemented priority sorting in task dispatcher (`priority: 100` for user mutations such as Wi-Fi update, WAN update, WAN deletion, reboot) so operator configuration changes are executed immediately before background parameter discovery (`priority: 10`).
+- **SOAP DeleteObject & AddObject Protocol Handlers:** Added full parser and session state handlers for `<cwmp:DeleteObjectResponse>` and `<cwmp:AddObjectResponse>` (RFC / TR-069 standard), enabling reliable deletion and creation of WAN connections.
+- **Precision Parameter Path Resolution:** Eliminated duplicate vendor parameter clashes during `SetParameterValues` on Wi-Fi SSID/passphrase across Genexis, Realtek, Syrotech, and TP-Link routers, preventing Fault 9005 invalid parameter rejections.
+
+---
+
 ## [v2.1.9] - 2026-08-22
 
 ### ⚡ Port 80 CWMP Ingestion & Active Fleet Restoration
